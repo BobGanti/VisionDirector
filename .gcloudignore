@@ -1,0 +1,28 @@
+# This file specifies files that should be ignored by the gcloud CLI
+# when uploading source code to Google Cloud.
+
+# Use .gitignore as a base
+#!include:.gitignore
+
+# Cloud-specific exclusions
+.gcloudignore
+.git
+.gitignore
+
+# Ignore IDE settings
+.vscode/
+.idea/
+
+# Ignore local environment and build noise
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+index.js.map
+
+# Ignore sensitive files (Double layer of protection)
+.env
+.env.*
+auth.json
+key.json

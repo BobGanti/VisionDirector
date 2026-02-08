@@ -1,0 +1,8 @@
+{
+  "name": "VisionDirector Elite (Python Edition)",
+  "description": "High-end cinematic production suite powered by Flask and Gemini.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
