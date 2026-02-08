@@ -12,12 +12,30 @@ const DEFAULT_VOICES: { id: VoiceProfile; label: string }[] = [
   { id: 'Puck', label: 'PUCK' },
   { id: 'Charon', label: 'CHARON' },
   { id: 'Fenrir', label: 'FENRIR' },
-  { id: 'Aoide', label: 'AOIDE' },
-  { id: 'Orion', label: 'ORION' }
+  { id: 'Leda', label: 'LEDA' },
+  { id: 'Orus', label: 'ORUS' },
+  { id: 'Umbriel', label: 'UMBRIEL' },
+  { id: 'Algieba', label: 'ALGIEBA' },
+  { id: 'Enceladus', label: 'ENCELADUS' }
 ];
+
+type Supplier = 'google' | 'openai';
+
+const SUPPLIER_STORAGE_KEY = 'vision_studio_supplier_v23';
+
+const SUPPLIERS: { id: Supplier; label: string; uiLabel: string }[] = [
+  { id: 'google', label: 'Google', uiLabel: 'GOOGLE' },
+  { id: 'openai', label: 'OpenAI', uiLabel: 'OPENAI' },
+];
+
 
 const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) => {
   const [vaultOpen, setVaultOpen] = useState(false);
+  const [supplier, setSupplier] = useState<Supplier>(() => {
+    const saved = localStorage.getItem(SUPPLIER_STORAGE_KEY);
+    return saved === 'openai' ? 'openai' : 'google';
+  });
+
 
   const [assets, setAssets] = useState<MediaAsset[]>(() => {
     try {
@@ -54,6 +72,9 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
   useEffect(() => { localStorage.setItem('vision_studio_assets_v23', JSON.stringify(assets)); }, [assets]);
   useEffect(() => { localStorage.setItem('vision_studio_voices_v23', JSON.stringify(customVoices)); }, [customVoices]);
+
+  useEffect(() => { localStorage.setItem(SUPPLIER_STORAGE_KEY, supplier); }, [supplier]);
+
 
   const showError = (msg: string) => {
     setErrorMsg(msg);
@@ -343,6 +364,18 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
                   {/* Desktop controls */}
                   <div className="hidden sm:flex flex-wrap justify-end gap-3 md:gap-4">
                     <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[7px] font-black text-zinc-500 uppercase">Supplier</span>
+                        <select
+                          value={supplier}
+                          onChange={(e) => setSupplier(e.target.value as Supplier)}
+                          className="bg-white/5 text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border border-white/10 text-sky-400 outline-none"
+                        >
+                          {SUPPLIERS.map(p => (
+                            <option key={p.id} value={p.id}>{p.uiLabel}</option>
+                          ))}
+                        </select>
+                      </div>
                       <span className="text-[7px] font-black text-zinc-500 uppercase">Aspect</span>
                       <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} className="bg-white/5 text-[9px] font-black uppercase px-3 py-1.5 rounded-xl border border-white/10 text-emerald-400 outline-none">
                         <option value="9:16">9:16 PORTRAIT</option><option value="16:9">16:9 LANDSCAPE</option><option value="1:1">1:1 SQUARE</option>
@@ -369,6 +402,15 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
                 {/* Mobile controls row */}
                 <div className="sm:hidden flex flex-wrap gap-3 px-1">
+                  <select
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value as Supplier)}
+                    className="flex-1 min-w-[110px] bg-white/5 text-[9px] font-black uppercase px-3 py-2 rounded-xl border border-white/10 text-sky-400 outline-none"
+                  >
+                    {SUPPLIERS.map(p => (
+                      <option key={p.id} value={p.id}>{p.uiLabel}</option>
+                    ))}
+                  </select>
                   <select value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} className="flex-1 min-w-[110px] bg-white/5 text-[9px] font-black uppercase px-3 py-2 rounded-xl border border-white/10 text-emerald-400 outline-none">
                     <option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option>
                   </select>
