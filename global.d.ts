@@ -13,3 +13,5 @@ declare module 'path';
 
 // Browser-side process.env shim (injected by server.js / app.py)
 declare const process: { env: { API_KEY?: string; GEMINI_API_KEY?: string } };
+
+declare module "react-dom";

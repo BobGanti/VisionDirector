@@ -133,27 +133,37 @@ export class GeminiService {
     return { url: URL.createObjectURL(b), videoRef: videoObj };
   }
 
-  static async playVoicePreview(voice: VoiceProfile, speed: SpeechSpeed = 'natural', traits: string = "", text: string = "Identity verified.") {
-    try {
-      const ai = this.getAI();
-      const response = await ai.models.generateContent({
-        model: MODEL_REGISTRY.TTS_PREVIEW,
-        contents: [{ parts: [{ text: `Profile: ${traits}. Style: ${speed}. Script: ${text}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: (voice as any) } } }
-        }
-      });
-      const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (data) {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        const buffer = await decodeAudioData(decode(data), ctx, 24000, 1);
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start();
+  static async playVoicePreview(
+    voice: VoiceProfile,
+    speed: SpeechSpeed = 'natural',
+    traits: string = "",
+    text: string = "Identity verified."
+  ): Promise<void> {
+    const ai = this.getAI();
+
+    const response = await ai.models.generateContent({
+      model: MODEL_REGISTRY.TTS_PREVIEW,
+      contents: [{ parts: [{ text: `Profile: ${traits}. Style: ${speed}. Script: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: (voice as any) } } }
       }
-    } catch (e) { console.error("Preview failed", e); }
+    });
+
+    const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!data) throw new Error("PREVIEW_FAILED: No audio returned.");
+
+    const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as any;
+    const ctx = new AudioCtx({ sampleRate: 24000 }) as AudioContext;
+
+    // Browsers may start the context suspended until a user gesture occurs.
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    const buffer = await decodeAudioData(decode(data), ctx, 24000, 1);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
   }
 
   static async parseScript(prompt: string): Promise<ParsedScript> {
