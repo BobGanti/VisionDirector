@@ -28,10 +28,13 @@ const App: React.FC = () => {
       }
       
       // 3. Check for process.env (Server Injection)
-      if (process.env.API_KEY && process.env.API_KEY !== "undefined" && process.env.API_KEY.length > 5) {
+      // 3. Check for server-injected key (browser shim)
+      const injectedKey = (window as any)?.process?.env?.API_KEY;
+      if (injectedKey && injectedKey !== "undefined" && injectedKey.length > 5) {
         setHasKey(true);
       }
       setIsLoading(false);
+
     };
 
     check();

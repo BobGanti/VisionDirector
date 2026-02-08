@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MediaAsset, AppStatus, VoiceProfile, AspectRatio, ParsedScript, CustomVoice, SpeechSpeed, Sentiment } from '../types';
-import { GeminiService } from '../services/geminiService';
+import { getAIProvider } from '../services/aiProvider';
 import { AssetCard } from './AssetCard';
 import { LoadingOverlay } from './LoadingOverlay';
 import { ModelMap } from './ModelMap';
@@ -65,6 +65,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   const [showBlueprint, setShowBlueprint] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ai = getAIProvider(supplier as any);
 
   const activeAsset = assets.find(a => a.id === selectedAssetId) || null;
   const activeAudio = assets.find(a => a.type === 'audio' && a.id === selectedAudioId) || null;
@@ -93,14 +94,14 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   const handleExecuteRender = async () => {
     try {
       setStatus(isExtensionMode ? AppStatus.EXTENDING_VIDEO : AppStatus.ANALYZING_SCRIPT);
-      const script = await GeminiService.parseScript(prompt);
+      const script = await ai.parseScript(prompt);
 
       let img1 = activeAsset?.type === 'image' ? activeAsset : null;
       let extensionRef = isExtensionMode ? activeAsset?.videoRef : null;
 
       if (!img1 && !activeAudio && !extensionRef && prompt) {
         setStatus(AppStatus.GENERATING_IMAGE);
-        const genImg = await GeminiService.generateImage(script.visuals || prompt, aspectRatio);
+        const genImg = await ai.generateImage(script.visuals || prompt, aspectRatio);
         if (genImg) {
           const newAsset = { id: `gen-${Date.now()}`, type: 'image' as const, url: genImg, timestamp: Date.now(), fileName: "GEN_REF.png" };
           setAssets(prev => [newAsset, ...prev]);
@@ -111,16 +112,16 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       let voiceTraits = "";
       if (activeAudio) {
         setStatus(AppStatus.GENERATING_AUDIO);
-        voiceTraits = await GeminiService.analyzeVoice(activeAudio.url, sentiment);
+        voiceTraits = await ai.analyzeVoice(activeAudio.url, sentiment);
         if (!script.narration) {
-          script.narration = await GeminiService.transcribeAudio(activeAudio.url);
+          script.narration = await ai.transcribeAudio(activeAudio.url);
         }
       } else if (activeCustomVoiceId) {
         voiceTraits = customVoices.find(v => v.id === activeCustomVoiceId)?.traits || "";
       }
 
       setStatus(AppStatus.GENERATING_VIDEO);
-      const videoResult = await GeminiService.generateVideo(
+      const videoResult = await ai.generateVideo(
         script.visuals,
         script.narration,
         aspectRatio,
@@ -151,11 +152,11 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
     setStatus(AppStatus.GENERATING_AUDIO);
     try {
-      const traits = await GeminiService.analyzeVoice(activeAudio.url, sentiment);
+      const traits = await ai.analyzeVoice(activeAudio.url, sentiment);
       const newVoice = { id: `v-${Date.now()}`, label: label.toUpperCase(), baseVoice: activeVoice, traits, speed: speechSpeed, sentiment };
       setCustomVoices(prev => [newVoice, ...prev]);
       setActiveCustomVoiceId(newVoice.id);
-      GeminiService.playVoicePreview(newVoice.baseVoice, newVoice.speed, newVoice.traits, `Identity Captured.`);
+      await ai.playVoicePreview(newVoice.baseVoice, newVoice.speed, newVoice.traits, `Identity Captured.`);
     } catch (e) {
       showError("Cloning failed.");
     } finally {
@@ -172,9 +173,9 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       if (activeCustomVoiceId) {
         const cv = customVoices.find(v => v.id === activeCustomVoiceId);
         if (!cv) throw new Error("VOICE_PROFILE_NOT_FOUND");
-        await GeminiService.playVoicePreview(cv.baseVoice, cv.speed, cv.traits, `Preview: ${cv.label}.`);
+        await ai.playVoicePreview(cv.baseVoice, cv.speed, cv.traits, `Preview: ${cv.label}.`);
       } else {
-        await GeminiService.playVoicePreview(activeVoice, speechSpeed, "", `Preview: ${activeVoice}.`);
+        await ai.playVoicePreview(activeVoice, speechSpeed, "", `Preview: ${activeVoice}.`);
       }
     } catch (e: any) {
       showError(e?.message || "Preview failed.");

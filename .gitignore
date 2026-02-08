@@ -31,3 +31,4 @@ Thumbs.db
 # Local data (if any)
 *.db
 *.sqlite
+*.zip
