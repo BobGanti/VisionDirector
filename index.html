@@ -18,13 +18,18 @@
       --panel: #0a0a0c;
     }
 
+    html, body, #root { height: 100%; }
+
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--bg);
       color: #fafafa;
       margin: 0;
       padding: 0;
-      overflow: hidden;
+
+      /* ✅ allow vertical scroll on mobile */
+      overflow-x: hidden;
+      overflow-y: auto;
     }
 
     h1, h2, .font-mono {
