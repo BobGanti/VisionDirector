@@ -68,7 +68,7 @@ const openaiProvider: AIProvider = {
   transcribeAudio: (audioBase64) => OpenAIService.transcribeAudio(audioBase64),
   playVoicePreview: (voice, speed = "natural", traits = "", text = "Identity verified.") =>
     OpenAIService.playVoicePreview(voice, speed, traits, text),
-  generateVideo: (
+  generateVideo: async (
     visualPrompt,
     narrationScript,
     aspectRatio,
@@ -78,18 +78,56 @@ const openaiProvider: AIProvider = {
     speed,
     sentiment,
     videoToExtend
-  ) =>
-    OpenAIService.generateVideo(
-      visualPrompt,
-      narrationScript,
-      aspectRatio,
-      startImageBase64,
-      voiceTraits,
-      prebuiltVoice,
-      speed,
-      sentiment,
-      videoToExtend
-    ),
+  ) => {
+    try {
+      return await OpenAIService.generateVideo(
+        visualPrompt,
+        narrationScript,
+        aspectRatio,
+        startImageBase64,
+        voiceTraits,
+        prebuiltVoice,
+        speed,
+        sentiment,
+        videoToExtend
+      );
+    } catch (e: any) {
+      const msg = String(e?.message || e || "");
+      const m = msg.toLowerCase();
+
+      const blocked =
+        m.includes("blocked") ||
+        m.includes("moderation") ||
+        m.includes("safety") ||
+        m.includes("policy");
+
+      if (!blocked) throw e;
+
+      console.warn("[VisionDirector] OpenAI video blocked. Falling back to Google video…");
+
+      try {
+        return await GeminiService.generateVideo(
+          visualPrompt,
+          narrationScript,
+          aspectRatio,
+          startImageBase64,
+          voiceTraits,
+          prebuiltVoice,
+          speed,
+          sentiment,
+          videoToExtend
+        );
+      } catch (g: any) {
+        const gmsg = String(g?.message || g || "");
+        throw new Error(
+          `OPENAI_VIDEO_BLOCKED: OpenAI refused this video request. ` +
+          `Set a Google API key (or switch Supplier to GOOGLE) to render video. ` +
+          `OpenAI: ${msg} | Google fallback: ${gmsg}`
+        );
+      }
+    }
+  },
+
 };
 
 export function getAIProvider(supplier: Supplier): AIProvider {

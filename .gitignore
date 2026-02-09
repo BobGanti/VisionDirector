@@ -32,3 +32,4 @@ Thumbs.db
 *.db
 *.sqlite
 *.zip
+services/modelOverrides.ts

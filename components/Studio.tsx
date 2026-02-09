@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, type ReactFC } from 'react';
 import { MediaAsset, AppStatus, VoiceProfile, AspectRatio, ParsedScript, CustomVoice, SpeechSpeed, Sentiment } from '../types';
 import { getAIProvider } from '../services/aiProvider';
 import { AssetCard } from './AssetCard';
@@ -40,8 +40,12 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   const [assets, setAssets] = useState<MediaAsset[]>(() => {
     try {
       const saved = localStorage.getItem('vision_studio_assets_v23');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+      const parsed = saved ? JSON.parse(saved) : [];
+      // Drop anything that has no usable URL (we won't persist videos anyway)
+      return Array.isArray(parsed) ? parsed.filter((a: any) => a?.url && String(a.url).length > 0) : [];
+    } catch {
+      return [];
+    }
   });
 
   const [customVoices, setCustomVoices] = useState<CustomVoice[]>(() => {
@@ -71,11 +75,53 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   const activeAudio = assets.find(a => a.type === 'audio' && a.id === selectedAudioId) || null;
   const isExtensionMode = activeAsset?.type === 'video' && !!activeAsset.videoRef;
 
-  useEffect(() => { localStorage.setItem('vision_studio_assets_v23', JSON.stringify(assets)); }, [assets]);
-  useEffect(() => { localStorage.setItem('vision_studio_voices_v23', JSON.stringify(customVoices)); }, [customVoices]);
+  useEffect(() => {
+    try {
+      const safeAssets = assets.map((a) => {
+        // Never persist videos (can be huge / blob URLs won’t survive refresh anyway)
+        if (a.type === "video") return null;
 
-  useEffect(() => { localStorage.setItem(SUPPLIER_STORAGE_KEY, supplier); }, [supplier]);
+        // Also drop very large data URLs (usually audio) to avoid quota crashes
+        if (typeof a.url === "string" && a.url.startsWith("data:") && a.url.length > 200_000) return null;
 
+        return a;
+      }).filter(Boolean);
+
+      localStorage.setItem("vision_studio_assets_v23", JSON.stringify(safeAssets));
+    } catch (e) {
+      console.warn("[VisionDirector] Asset persistence skipped (localStorage quota).", e);
+    }
+  }, [assets]);
+
+  useEffect(() => {
+    try {
+      // NEVER persist videos or huge base64 payloads to localStorage
+      const safeAssets = assets
+        .filter(a => a.type !== "video")
+        .map(a => ({ ...a, videoRef: undefined })) // avoid huge/circular refs
+        .filter(a => typeof a.url === "string" && (!a.url.startsWith("data:") || a.url.length < 200_000));
+
+      localStorage.setItem("vision_studio_assets_v23", JSON.stringify(safeAssets));
+    } catch (err) {
+      // Critical: do not let quota errors crash the UI
+      console.warn("[VisionDirector] Skipped asset persistence:", err);
+    }
+  }, [assets]);
+
+  useEffect(() => {
+  try {
+    // NEVER persist videos or huge base64 payloads to localStorage
+    const safeAssets = assets
+      .filter(a => a.type !== "video")
+      .map(a => ({ ...a, videoRef: undefined })) // avoid huge/circular refs
+      .filter(a => typeof a.url === "string" && (!a.url.startsWith("data:") || a.url.length < 200_000));
+
+    localStorage.setItem("vision_studio_assets_v23", JSON.stringify(safeAssets));
+  } catch (err) {
+      // Critical: do not let quota errors crash the UI
+      console.warn("[VisionDirector] Skipped asset persistence:", err);
+    }
+  }, [assets]);
 
   const showError = (msg: string) => {
     setErrorMsg(msg);

@@ -1,4 +1,6 @@
 import type { AspectRatio, ParsedScript, Sentiment, SpeechSpeed, VoiceProfile } from "../types";
+import type { ModelMapping } from "../types";
+
 
 type VideoJob = {
   id: string;
@@ -36,6 +38,31 @@ function dataUrlToBytes(dataUrl: string): { mime: string; bytes: Uint8Array } {
   return { mime, bytes };
 }
 
+function normaliseAudioMime(mime: string): string {
+  const m = (mime || "").toLowerCase().trim();
+  if (m === "audio/mp3") return "audio/mpeg";
+  if (m === "audio/x-m4a") return "audio/mp4";
+  if (m === "audio/wave") return "audio/wav";
+  return m || "application/octet-stream";
+}
+
+function filenameForAudio(mime: string, bytes: Uint8Array): { filename: string; mime: string } {
+  let m = normaliseAudioMime(mime);
+
+  // Sniff MP3 (ID3 header)
+  const isMp3 = bytes.length > 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33;
+  if (m === "application/octet-stream" && isMp3) m = "audio/mpeg";
+
+  if (m.includes("mpeg")) return { filename: "audio.mp3", mime: m };
+  if (m.includes("wav")) return { filename: "audio.wav", mime: m };
+  if (m.includes("mp4")) return { filename: "audio.m4a", mime: m };
+  if (m.includes("webm")) return { filename: "audio.webm", mime: m };
+  if (m.includes("ogg")) return { filename: "audio.ogg", mime: m };
+
+  // Fallback: treat as MP3 (most common)
+  return { filename: "audio.mp3", mime: m === "application/octet-stream" ? "audio/mpeg" : m };
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   // chunked to avoid stack blow-ups
   let s = "";
@@ -64,8 +91,46 @@ function aspectToVideoSize(ar: AspectRatio): "1280x720" | "720x1280" | "1080x108
   return "1080x1080";
 }
 
+function parseSize(size: string): { w: number; h: number } {
+  const [w, h] = size.split("x").map((n) => parseInt(n, 10));
+  return { w: Number.isFinite(w) ? w : 720, h: Number.isFinite(h) ? h : 1280 };
+}
+
+async function resizeImageDataUrlToPngBlob(dataUrl: string, targetW: number, targetH: number): Promise<Blob> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = dataUrl;
+
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("REFERENCE_IMAGE_LOAD_FAILED"));
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("CANVAS_CONTEXT_FAILED");
+
+  // “Cover” crop: fill target size without letterboxing
+  const scale = Math.max(targetW / img.width, targetH / img.height);
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const dx = (targetW - drawW) / 2;
+  const dy = (targetH - drawH) / 2;
+
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("CANVAS_TO_BLOB_FAILED"))), "image/png");
+  });
+
+  return blob;
+}
+
 function mapVoiceToOpenAIVoice(v: VoiceProfile): string {
-  // Pick from built-in voices (alloy/echo/fable/onyx/nova/verse etc.)
+  // Pick from built-in voices
   switch (v) {
     case "Zephyr": return "alloy";
     case "Kore": return "verse";
@@ -74,6 +139,14 @@ function mapVoiceToOpenAIVoice(v: VoiceProfile): string {
     case "Fenrir": return "fable";
     case "Aoide": return "nova";
     case "Orion": return "shimmer";
+
+    // Extra presets
+    case "Leda": return "ash";
+    case "Orus": return "sage";
+    case "Umbriel": return "ballad";
+    case "Algieba": return "coral";
+    case "Enceladus": return "shimmer";
+
     default: return "alloy";
   }
 }
@@ -117,6 +190,65 @@ export class OpenAIService {
       "Authorization": `Bearer ${key}`,
       "Content-Type": "application/json",
     };
+  }
+
+  static getModelMap(): ModelMapping[] {
+    const textModel = (process?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
+    const imageModel = (process?.env?.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
+    const videoModel = (process?.env?.OPENAI_VIDEO_MODEL || "sora").trim();
+    const ttsModel = (process?.env?.OPENAI_TTS_MODEL || "gpt-4o-mini-tts").trim();
+    const sttModel = (process?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
+
+    return [
+      {
+        feature: "Script Intelligence (OpenAI)",
+        model: textModel,
+        role: "JSON Extraction",
+        context: "Parses user prompts into structured scenes.",
+        file: "services/openaiService.ts",
+        method: "parseScript()",
+      },
+      {
+        feature: "Sonic Transcription (OpenAI)",
+        model: sttModel,
+        role: "Audio-to-Text",
+        context: "Converts voice recordings into text script.",
+        file: "services/openaiService.ts",
+        method: "transcribeAudio()",
+      },
+      {
+        feature: "Acoustic DNA Analysis (OpenAI)",
+        model: textModel,
+        role: "Vocal Signature Extraction",
+        context: "Extracts a descriptive voice signature used for synthesis guidance.",
+        file: "services/openaiService.ts",
+        method: "analyzeVoice()",
+      },
+      {
+        feature: "Voice Preview (OpenAI)",
+        model: ttsModel,
+        role: "TTS Preview",
+        context: "Plays a short preview of the selected voice settings.",
+        file: "services/openaiService.ts",
+        method: "playVoicePreview()",
+      },
+      {
+        feature: "Visual Synthesis (OpenAI)",
+        model: imageModel,
+        role: "T2I / I2I Rendering",
+        context: "Generates the cinematic keyframe.",
+        file: "services/openaiService.ts",
+        method: "generateImage()",
+      },
+      {
+        feature: "Cinematic Rendering (OpenAI)",
+        model: videoModel,
+        role: "Temporal Motion Synthesis",
+        context: "Generates video from prompt and/or a start frame.",
+        file: "services/openaiService.ts",
+        method: "generateVideo()",
+      },
+    ];
   }
 
   static async parseScript(prompt: string): Promise<ParsedScript> {
@@ -182,11 +314,14 @@ export class OpenAIService {
     const size = aspectToImageSize(aspectRatio);
 
     const body = {
-      model,
-      prompt: prompt || "",
-      size,
-      n: 1,
-      response_format: "b64_json",
+        model,
+        prompt: prompt || "",
+        size,
+        n: 1,
+        // For GPT Image models, use output_format (response_format is for DALL·E models).
+        output_format: "png",
+        quality: "auto",
+        background: "auto",
     };
 
     const res = await fetch(`${OPENAI_BASE}/images/generations`, {
@@ -207,28 +342,43 @@ export class OpenAIService {
     return `data:image/png;base64,${b64}`;
   }
 
-  static async transcribeAudio(audioBase64: string): Promise<string> {
+  static async transcribeAudio(audioDataUrl: string): Promise<string> {
     const model = (process?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
-
-    const { mime, bytes } = dataUrlToBytes(audioBase64);
-    const blob = new Blob([bytes], { type: mime || "audio/wav" });
-
-    const form = new FormData();
-    form.append("model", model);
-    form.append("file", blob, "audio.wav");
 
     const key = OpenAIService.getKey();
     if (!key) throw new Error("OPENAI_API_KEY_MISSING");
 
+    // Turn the data: URL into an actual Blob (avoids Uint8Array/bytes.buffer issues entirely)
+    const blob0 = await (await fetch(audioDataUrl)).blob();
+
+    // Normalise MIME (OpenAI is picky when mp3 comes through as audio/mp3)
+    let mime = (blob0.type || "").toLowerCase().trim();
+    if (mime === "audio/mp3") mime = "audio/mpeg";
+    if (!mime) mime = "audio/mpeg";
+
+    // Pick a filename that matches the MIME
+    let filename = "audio.mp3";
+    if (mime.includes("wav")) filename = "audio.wav";
+    else if (mime.includes("mp4")) filename = "audio.m4a";
+    else if (mime.includes("webm")) filename = "audio.webm";
+    else if (mime.includes("ogg")) filename = "audio.ogg";
+
+    // Force the blob to carry the normalised MIME
+    const blob = blob0.slice(0, blob0.size, mime);
+
+    const form = new FormData();
+    form.append("model", model);
+    form.append("file", blob, filename);
+
     const res = await fetch(`${OPENAI_BASE}/audio/transcriptions`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${key}` },
-      body: form,
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}` },
+        body: form,
     });
 
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`OPENAI_TRANSCRIBE_FAILED: ${t}`);
+        const t = await res.text();
+        throw new Error(`OPENAI_TRANSCRIBE_FAILED: ${t}`);
     }
 
     const json = await res.json();
@@ -245,14 +395,7 @@ export class OpenAIService {
       instructions:
         "Given the transcript and the target sentiment, produce a short voice-style descriptor " +
         "that a TTS/video model could follow. Return plain text only.",
-      input: [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: `Sentiment: ${sentiment}\nTranscript:\n${transcript}` },
-          ],
-        },
-      ],
+      input: `Sentiment: ${sentiment}\nTranscript:\n${transcript}`,
     };
 
     const res = await fetch(`${OPENAI_BASE}/responses`, {
@@ -366,9 +509,9 @@ export class OpenAIService {
     form.append("size", size);
 
     if (startImageBase64) {
-      const { mime, bytes } = dataUrlToBytes(startImageBase64);
-      const blob = new Blob([bytes], { type: mime || "image/png" });
-      form.append("input_reference", blob, "ref.png");
+        const { w, h } = parseSize(size); // size is your video size string like "720x1280"
+        const refBlob = await resizeImageDataUrlToPngBlob(startImageBase64, w, h);
+        form.append("input_reference", refBlob, "ref.png");
     }
 
     const createRes = await fetch(`${OPENAI_BASE}/videos`, {
@@ -419,17 +562,80 @@ export class OpenAIService {
 
   private static async fetchVideoAsDataUrl(videoId: string, key: string): Promise<string> {
     const res = await fetch(`${OPENAI_BASE}/videos/${videoId}/content`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${key}` },
+        method: "GET",
+        headers: { "Authorization": `Bearer ${key}` },
     });
 
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`OPENAI_VIDEO_CONTENT_FAILED: ${t}`);
+        const t = await res.text();
+        throw new Error(`OPENAI_VIDEO_CONTENT_FAILED: ${t}`);
     }
 
     const buf = await res.arrayBuffer();
-    const b64 = arrayBufferToBase64(buf);
-    return `data:video/mp4;base64,${b64}`;
+    const blob = new Blob([buf], { type: "video/mp4" });
+
+    // IMPORTANT: blob URL is tiny and won’t nuke localStorage / memory like base64 does
+    return URL.createObjectURL(blob);
   }
+
+    static getModelMap(): ModelMapping[] {
+    const textModel = ((process as any)?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
+    const imageModel = ((process as any)?.env?.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
+    const transcribeModel = ((process as any)?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
+    const ttsModel = ((process as any)?.env?.OPENAI_TTS_MODEL || "gpt-4o-mini-tts").trim();
+    const videoModel = ((process as any)?.env?.OPENAI_VIDEO_MODEL || "sora-2").trim();
+
+    return [
+      {
+        feature: "Script Intelligence",
+        model: textModel,
+        role: "Prompt → structured script",
+        context: "Parses user prompts into structured visuals and narration.",
+        file: "services/openaiService.ts",
+        method: "parseScript()  // @MODEL_CALL_SITE",
+      },
+      {
+        feature: "Sonic Transcription",
+        model: transcribeModel,
+        role: "Audio → text",
+        context: "Transcribes an uploaded audio track into narration text.",
+        file: "services/openaiService.ts",
+        method: "transcribeAudio()  // @MODEL_CALL_SITE",
+      },
+      {
+        feature: "Acoustic DNA Analysis",
+        model: textModel,
+        role: "Voice traits inference",
+        context: "Extracts voice traits from a DNA audio reference.",
+        file: "services/openaiService.ts",
+        method: "analyzeVoice()  // @MODEL_CALL_SITE",
+      },
+      {
+        feature: "Visual Synthesis",
+        model: imageModel,
+        role: "Text → image",
+        context: "Generates a reference image (when no user image is provided).",
+        file: "services/openaiService.ts",
+        method: "generateImage()  // @MODEL_CALL_SITE",
+      },
+      {
+        feature: "Voice Preview",
+        model: ttsModel,
+        role: "Text → speech",
+        context: "Plays a short TTS preview for the selected voice.",
+        file: "services/openaiService.ts",
+        method: "playVoicePreview()  // @MODEL_CALL_SITE",
+      },
+      {
+        feature: "Cinematic Video Generation",
+        model: videoModel,
+        role: "Image/text → video",
+        context: "Creates or extends a short clip from the prompt + narration.",
+        file: "services/openaiService.ts",
+        method: "generateVideo()  // @MODEL_CALL_SITE",
+      },
+    ];
+  }
+
+
 }
