@@ -1,6 +1,34 @@
 import type { AspectRatio, ParsedScript, Sentiment, SpeechSpeed, VoiceProfile } from "../types";
 import type { ModelMapping } from "../types";
+import { ensureModelRegistryLoaded, getEffectiveModel, getModelOverride } from "./modelOverrides";
 
+
+export const OPENAI_MODEL_DEFAULTS = {
+  TEXT_MODEL: "gpt-5.1-mini",
+  IMAGE_MODEL: "gpt-image-1",
+  TRANSCRIBE_MODEL: "gpt-4o-mini-transcribe",
+  TTS_MODEL: "gpt-4o-mini-tts",
+  VIDEO_MODEL: "sora-2",
+} as const;
+
+type OpenAIModelKey = keyof typeof OPENAI_MODEL_DEFAULTS;
+
+function openaiModel(key: OpenAIModelKey): string {
+  const override = getModelOverride("openai", String(key));
+  if (override) return override;
+
+  const envMap: Record<OpenAIModelKey, any> = {
+    TEXT_MODEL: (process as any)?.env?.OPENAI_TEXT_MODEL,
+    IMAGE_MODEL: (process as any)?.env?.OPENAI_IMAGE_MODEL,
+    TRANSCRIBE_MODEL: (process as any)?.env?.OPENAI_TRANSCRIBE_MODEL,
+    TTS_MODEL: (process as any)?.env?.OPENAI_TTS_MODEL,
+    VIDEO_MODEL: (process as any)?.env?.OPENAI_VIDEO_MODEL,
+  };
+
+  const envVal = envMap[key];
+  if (typeof envVal === "string" && envVal.trim()) return envVal.trim();
+  return OPENAI_MODEL_DEFAULTS[key];
+}
 
 type VideoJob = {
   id: string;
@@ -13,13 +41,29 @@ type VideoResult = { url: string; videoRef?: any };
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 
+type OpenAIAgencyKey =
+  | "SCRIPT_PARSER"
+  | "DICTATION"
+  | "VOICE_ANALYZER"
+  | "AUTO_NARRATOR"
+  | "IMAGE_GEN"
+  | "VIDEO_GEN"
+  | "TTS_PREVIEW";
+
+async function requireOpenAIModel(key: OpenAIAgencyKey): Promise<string> {
+  await ensureModelRegistryLoaded("openai");
+  const model = getEffectiveModel("openai", key);
+  if (!model) throw new Error(`MODEL_REGISTRY_MISSING_KEY: ${key}`);
+  return model;
+}
+
 // Safe, small mappings (tweak later if you want)
 const SPEED_TO_MULTIPLIER: Record<SpeechSpeed, number> = {
-  slower: 0.85,
-  slow: 0.95,
+  slower: 0.75,
+  slow: 0.85,
   natural: 1.0,
   fast: 1.1,
-  faster: 1.2,
+  faster: 1.4,
 };
 
 function sleep(ms: number) {
@@ -83,13 +127,12 @@ function aspectToImageSize(ar: AspectRatio): "1024x1024" | "1536x1024" | "1024x1
   return "1024x1024";
 }
 
-function aspectToVideoSize(ar: AspectRatio): "1280x720" | "720x1280" | "1080x1080" | "1920x1080" | "1024x1792" | "1792x1024" {
-  // Keep it compatible with the Video API examples (portrait/landscape).
+function aspectToVideoSize(ar: AspectRatio): "1280x720" | "720x1280" {
   if (ar === "16:9") return "1280x720";
-  if (ar === "9:16") return "720x1280";
-  // Video API doesn’t advertise true 1:1 in the basic examples, so use 1080x1080.
-  return "1080x1080";
+  // Treat 9:16 and 1:1 as portrait for Sora standard sizing.
+  return "720x1280";
 }
+
 
 function parseSize(size: string): { w: number; h: number } {
   const [w, h] = size.split("x").map((n) => parseInt(n, 10));
@@ -192,67 +235,8 @@ export class OpenAIService {
     };
   }
 
-  static getModelMap(): ModelMapping[] {
-    const textModel = (process?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
-    const imageModel = (process?.env?.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
-    const videoModel = (process?.env?.OPENAI_VIDEO_MODEL || "sora").trim();
-    const ttsModel = (process?.env?.OPENAI_TTS_MODEL || "gpt-4o-mini-tts").trim();
-    const sttModel = (process?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
-
-    return [
-      {
-        feature: "Script Intelligence (OpenAI)",
-        model: textModel,
-        role: "JSON Extraction",
-        context: "Parses user prompts into structured scenes.",
-        file: "services/openaiService.ts",
-        method: "parseScript()",
-      },
-      {
-        feature: "Sonic Transcription (OpenAI)",
-        model: sttModel,
-        role: "Audio-to-Text",
-        context: "Converts voice recordings into text script.",
-        file: "services/openaiService.ts",
-        method: "transcribeAudio()",
-      },
-      {
-        feature: "Acoustic DNA Analysis (OpenAI)",
-        model: textModel,
-        role: "Vocal Signature Extraction",
-        context: "Extracts a descriptive voice signature used for synthesis guidance.",
-        file: "services/openaiService.ts",
-        method: "analyzeVoice()",
-      },
-      {
-        feature: "Voice Preview (OpenAI)",
-        model: ttsModel,
-        role: "TTS Preview",
-        context: "Plays a short preview of the selected voice settings.",
-        file: "services/openaiService.ts",
-        method: "playVoicePreview()",
-      },
-      {
-        feature: "Visual Synthesis (OpenAI)",
-        model: imageModel,
-        role: "T2I / I2I Rendering",
-        context: "Generates the cinematic keyframe.",
-        file: "services/openaiService.ts",
-        method: "generateImage()",
-      },
-      {
-        feature: "Cinematic Rendering (OpenAI)",
-        model: videoModel,
-        role: "Temporal Motion Synthesis",
-        context: "Generates video from prompt and/or a start frame.",
-        file: "services/openaiService.ts",
-        method: "generateVideo()",
-      },
-    ];
-  }
-
   static async parseScript(prompt: string): Promise<ParsedScript> {
-    const model = (process?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
+    const model = await requireOpenAIModel("SCRIPT_PARSER");
 
     const body = {
       model,
@@ -310,7 +294,7 @@ export class OpenAIService {
   }
 
   static async generateImage(prompt: string, aspectRatio: AspectRatio): Promise<string | null> {
-    const model = (process?.env?.OPENAI_IMAGE_MODEL || "gpt-image-1.5").trim();
+    const model = await requireOpenAIModel("IMAGE_GEN");
     const size = aspectToImageSize(aspectRatio);
 
     const body = {
@@ -343,7 +327,7 @@ export class OpenAIService {
   }
 
   static async transcribeAudio(audioDataUrl: string): Promise<string> {
-    const model = (process?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
+    const model = await requireOpenAIModel("DICTATION");
 
     const key = OpenAIService.getKey();
     if (!key) throw new Error("OPENAI_API_KEY_MISSING");
@@ -388,7 +372,7 @@ export class OpenAIService {
   static async analyzeVoice(audioBase64: string, sentiment: Sentiment = "neutral"): Promise<string> {
     // This is NOT true “voice cloning”; it’s a text-based style summary to keep the app flowing.
     const transcript = await OpenAIService.transcribeAudio(audioBase64);
-    const model = (process?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
+    const model = await requireOpenAIModel("VOICE_ANALYZER");
 
     const body = {
       model,
@@ -420,7 +404,7 @@ export class OpenAIService {
     traits: string = "",
     text: string = "Identity verified."
   ): Promise<void> {
-    const ttsModel = (process?.env?.OPENAI_TTS_MODEL || "gpt-4o-mini-tts").trim();
+    const ttsModel = await requireOpenAIModel("TTS_PREVIEW");
     const openaiVoice = mapVoiceToOpenAIVoice(voice);
     const rate = SPEED_TO_MULTIPLIER[speed] ?? 1.0;
 
@@ -467,9 +451,9 @@ export class OpenAIService {
     const key = OpenAIService.getKey();
     if (!key) throw new Error("OPENAI_API_KEY_MISSING");
 
-    const model = (process?.env?.OPENAI_VIDEO_MODEL || "sora-2").trim();
+    const model = await requireOpenAIModel("VIDEO_GEN");
     const size = aspectToVideoSize(aspectRatio);
-    const seconds = "4"; // allowed: 4, 8, 12
+    const seconds = "12"; // allowed: 4, 8, 12
 
     const composedPrompt =
       `${visualPrompt || ""}\n\n` +
@@ -579,63 +563,20 @@ export class OpenAIService {
   }
 
     static getModelMap(): ModelMapping[] {
-    const textModel = ((process as any)?.env?.OPENAI_TEXT_MODEL || "gpt-4o-mini").trim();
-    const imageModel = ((process as any)?.env?.OPENAI_IMAGE_MODEL || "gpt-image-1").trim();
-    const transcribeModel = ((process as any)?.env?.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe").trim();
-    const ttsModel = ((process as any)?.env?.OPENAI_TTS_MODEL || "gpt-4o-mini-tts").trim();
-    const videoModel = ((process as any)?.env?.OPENAI_VIDEO_MODEL || "sora-2").trim();
+        const script = getEffectiveModel("openai", "SCRIPT_PARSER") || "(not loaded)";
+        const dictation = getEffectiveModel("openai", "DICTATION") || "(not loaded)";
+        const voice = getEffectiveModel("openai", "VOICE_ANALYZER") || "(not loaded)";
+        const image = getEffectiveModel("openai", "IMAGE_GEN") || "(not loaded)";
+        const tts = getEffectiveModel("openai", "TTS_PREVIEW") || "(not loaded)";
+        const video = getEffectiveModel("openai", "VIDEO_GEN") || "(not loaded)";
 
-    return [
-      {
-        feature: "Script Intelligence",
-        model: textModel,
-        role: "Prompt → structured script",
-        context: "Parses user prompts into structured visuals and narration.",
-        file: "services/openaiService.ts",
-        method: "parseScript()  // @MODEL_CALL_SITE",
-      },
-      {
-        feature: "Sonic Transcription",
-        model: transcribeModel,
-        role: "Audio → text",
-        context: "Transcribes an uploaded audio track into narration text.",
-        file: "services/openaiService.ts",
-        method: "transcribeAudio()  // @MODEL_CALL_SITE",
-      },
-      {
-        feature: "Acoustic DNA Analysis",
-        model: textModel,
-        role: "Voice traits inference",
-        context: "Extracts voice traits from a DNA audio reference.",
-        file: "services/openaiService.ts",
-        method: "analyzeVoice()  // @MODEL_CALL_SITE",
-      },
-      {
-        feature: "Visual Synthesis",
-        model: imageModel,
-        role: "Text → image",
-        context: "Generates a reference image (when no user image is provided).",
-        file: "services/openaiService.ts",
-        method: "generateImage()  // @MODEL_CALL_SITE",
-      },
-      {
-        feature: "Voice Preview",
-        model: ttsModel,
-        role: "Text → speech",
-        context: "Plays a short TTS preview for the selected voice.",
-        file: "services/openaiService.ts",
-        method: "playVoicePreview()  // @MODEL_CALL_SITE",
-      },
-      {
-        feature: "Cinematic Video Generation",
-        model: videoModel,
-        role: "Image/text → video",
-        context: "Creates or extends a short clip from the prompt + narration.",
-        file: "services/openaiService.ts",
-        method: "generateVideo()  // @MODEL_CALL_SITE",
-      },
-    ];
-  }
-
-
+        return [
+            { feature: "Script Intelligence", model: script, role: "Prompt → structured script", context: "Parses user prompts into structured visuals and narration.", file: "services/openaiService.ts", method: "parseScript()  // @MODEL_CALL_SITE" },
+            { feature: "Sonic Transcription", model: dictation, role: "Audio → text", context: "Transcribes an uploaded audio track into narration text.", file: "services/openaiService.ts", method: "transcribeAudio()  // @MODEL_CALL_SITE" },
+            { feature: "Acoustic DNA Analysis", model: voice, role: "Voice traits inference", context: "Extracts voice traits from a DNA audio reference.", file: "services/openaiService.ts", method: "analyzeVoice()  // @MODEL_CALL_SITE" },
+            { feature: "Visual Synthesis", model: image, role: "Text → image", context: "Generates a reference image (when no user image is provided).", file: "services/openaiService.ts", method: "generateImage()  // @MODEL_CALL_SITE" },
+            { feature: "Voice Preview", model: tts, role: "Text → speech", context: "Plays a short TTS preview for the selected voice.", file: "services/openaiService.ts", method: "playVoicePreview()  // @MODEL_CALL_SITE" },
+            { feature: "Cinematic Video Generation", model: video, role: "Image/text → video", context: "Creates or extends a short clip from the prompt + narration.", file: "services/openaiService.ts", method: "generateVideo()  // @MODEL_CALL_SITE" },
+        ];
+    }
 }

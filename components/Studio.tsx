@@ -251,15 +251,18 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   };
 
   return (
-    <div className="relative flex flex-col md:flex-row min-h-[100svh] md:h-screen bg-[#020202] text-zinc-100 font-inter overflow-x-hidden overflow-y-auto md:overflow-hidden">
+    <div className="relative flex flex-col md:flex-row min-h-[100svh] md:h-screen bg-[var(--bg)] text-zinc-100 font-inter overflow-x-hidden overflow-y-auto md:overflow-hidden">
       <LoadingOverlay status={status} />
       {showBlueprint && <ModelMap onClose={() => setShowBlueprint(false)} />}
 
       {/* Mobile backdrop when the Asset Vault is open */}
+            {/* Mobile backdrop when the Asset Vault is open */}
       {vaultOpen && (
         <button
+          type="button"
           aria-label="Close Asset Vault"
-          className="md:hidden fixed inset-0 z-[90] bg-black/70"
+          className="md:hidden fixed inset-0 z-[90]"
+          style={{ background: 'var(--backdrop)' }}
           onClick={() => setVaultOpen(false)}
         />
       )}
@@ -271,7 +274,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       )}
 
       {/* Asset Vault (desktop sidebar) */}
-      <aside className="hidden md:flex md:w-72 border-r border-white/5 bg-[#050505] flex-col shrink-0">
+      <aside className="hidden md:flex md:w-72 border-r border-white/5 bg-[var(--surface)] flex-col shrink-0">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-violet-500">Asset Vault</h2>
@@ -303,7 +306,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
       {/* Mobile drawer version of Asset Vault */}
       {vaultOpen && (
-        <aside className="md:hidden fixed inset-y-0 left-0 z-[100] w-[85vw] max-w-sm border-r border-white/10 bg-[#050505] flex flex-col">
+        <aside className="md:hidden fixed inset-y-0 left-0 z-[100] w-[85vw] max-w-sm border-r border-white/10 bg-[var(--surface)] flex flex-col">
           <div className="p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-violet-500">Asset Vault</h2>
@@ -311,15 +314,13 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-9 h-9 bg-white/5 rounded-lg flex items-center justify-center hover:bg-violet-600 transition-all"
-                  aria-label="Upload"
-                >
+                  aria-label="Upload">
                   <i className="fa-solid fa-plus text-[11px]"></i>
                 </button>
                 <button
                   onClick={() => setVaultOpen(false)}
                   className="w-9 h-9 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all"
-                  aria-label="Close"
-                >
+                  aria-label="Close">
                   <i className="fa-solid fa-xmark text-[12px]"></i>
                 </button>
               </div>
@@ -352,7 +353,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       )}
 
       <main className="flex flex-col min-w-0 flex-none md:flex-1">
-        <header className="h-14 px-4 md:px-6 flex items-center justify-between border-b border-white/5 bg-black">
+        <header className="h-14 px-4 md:px-6 flex items-center justify-between border-b border-white/5 bg-[var(--surface)]">
           <div className="flex items-center gap-3">
             <button
               className="md:hidden w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
@@ -377,8 +378,9 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
         </header>
 
         {/* Mobile: cap monitor height so the controls remain reachable below */}
-        <div className="bg-black flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden relative flex-none md:flex-1 h-[52svh] sm:h-[56svh] md:h-auto">
-          <div style={{ aspectRatio: aspectRatio.replace(':', '/') }} className="w-full max-w-4xl bg-[#0a0a0c] rounded-3xl shadow-2xl ring-1 ring-white/10 overflow-hidden flex items-center justify-center relative group">
+        <div className="bg-[var(--surface)] flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden relative flex-none md:flex-1 h-[52svh] sm:h-[56svh] md:h-auto">
+
+          <div style={{ aspectRatio: aspectRatio.replace(':', '/') }} className="w-full max-w-4xl bg-[var(--panel)] rounded-3xl shadow-2xl ring-1 ring-white/10 overflow-hidden flex items-center justify-center relative group">
             {activeAsset ? (
               activeAsset.type === 'video'
                 ? <video src={activeAsset.url} className="w-full h-full object-contain" autoPlay loop controls />
@@ -392,13 +394,13 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
           </div>
         </div>
 
-        <div className="p-4 md:p-8 border-t border-white/5 bg-[#080808] overflow-y-auto md:overflow-visible">
+        <div className="p-4 md:p-8 border-t border-white/5 bg-[var(--panel)] overflow-y-auto md:overflow-visible">
           <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-6 md:mb-8">
               <div className="flex-1 space-y-3">
                 <div className="flex justify-between items-center px-1">
                   <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
                       {isExtensionMode ? "Extension Script" : "Sequence Narrative"}
                     </span>
                     {activeAudio && (
@@ -496,8 +498,8 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
             <div className="flex flex-col md:flex-row md:items-center justify-between border-t border-white/5 pt-6 gap-4 md:gap-0">
               <div className="flex items-center gap-6 overflow-hidden flex-1">
                 <div className="shrink-0 flex flex-col">
-                  <span className="text-[9px] font-black uppercase text-zinc-600 tracking-widest">Identity Vault</span>
-                  <span className="text-[7px] text-zinc-700 font-bold uppercase">{activeAudio ? 'DNA ACTIVE' : 'PREBUILT'}</span>
+                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest">Identity Vault</span>
+                  <span className="text-[7px] text-zinc-400 font-bold uppercase">{activeAudio ? 'DNA ACTIVE' : 'PREBUILT'}</span>
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide pr-8">

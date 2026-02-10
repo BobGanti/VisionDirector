@@ -1,7 +1,10 @@
 import os
 from flask import Flask, send_from_directory, render_template_string
+from api.model_overrides import bp as model_overrides_bp
+
 
 app = Flask(__name__, static_folder='.')
+app.register_blueprint(model_overrides_bp)
 
 @app.route('/')
 def index():

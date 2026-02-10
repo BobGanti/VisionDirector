@@ -2,6 +2,7 @@
 import { GoogleGenAI, GenerateContentResponse, Modality, Type } from "@google/genai";
 import { VoiceProfile, AspectRatio, ParsedScript, ModelMapping, SpeechSpeed, Sentiment } from "../types";
 import { decode, decodeAudioData } from "../utils/audioUtils";
+import { getModelOverride } from "./modelOverrides";
 
 export const MODEL_REGISTRY = {
   SCRIPT_PARSER: 'gemini-3-flash-preview',
@@ -12,6 +13,12 @@ export const MODEL_REGISTRY = {
   VIDEO_GEN: 'veo-3.1-generate-preview',
   TTS_PREVIEW: 'gemini-2.5-flash-preview-tts'
 };
+
+type GeminiModelKey = keyof typeof MODEL_REGISTRY;
+
+function googleModel(key: GeminiModelKey): string {
+  return getModelOverride("google", String(key)) || MODEL_REGISTRY[key];
+}
 
 export class GeminiService {
   private static getAI() {
@@ -27,14 +34,21 @@ export class GeminiService {
 
   static getModelMap(): ModelMapping[] {
     return [
-      { feature: "Script Intelligence", model: MODEL_REGISTRY.SCRIPT_PARSER, role: "JSON Extraction", context: "Parses user prompts into structured scenes.", file: "services/geminiService.ts", method: "parseScript()" },
-      { feature: "Sonic Transcription", model: MODEL_REGISTRY.DICTATION, role: "Audio-to-Text", context: "Converts voice recordings into text script.", file: "services/geminiService.ts", method: "transcribeAudio()" },
-      { feature: "Acoustic DNA Analysis", model: MODEL_REGISTRY.VOICE_ANALYZER, role: "Vocal Signature Extraction", context: "Clones vocal DNA (timbre, resonance, cadence).", file: "services/geminiService.ts", method: "analyzeVoice()" },
-      { feature: "Visual Synthesis", model: MODEL_REGISTRY.IMAGE_GEN, role: "T2I / I2I Rendering", context: "Generates the cinematic keyframe.", file: "services/geminiService.ts", method: "generateImage()" },
-      { feature: "Cinematic Rendering", model: MODEL_REGISTRY.VIDEO_GEN, role: "Temporal Motion Synthesis", context: "The VEO video generation engine.", file: "services/geminiService.ts", method: "generateVideo()" },
+      { feature: "Script Intelligence", model: googleModel("SCRIPT_PARSER"), role: "JSON Extraction", context: "Parses user prompts into structured scenes.", file: "services/geminiService.ts", method: "parseScript()" },
+      { feature: "Sonic Transcription", model: googleModel("DICTATION"), role: "Audio-to-Text", context: "Converts voice recordings into text script.", file: "services/geminiService.ts", method: "transcribeAudio()" },
+      { feature: "Acoustic DNA Analysis", model: googleModel("VOICE_ANALYZER"), role: "Vocal Signature Extraction", context: "Clones vocal DNA (timbre, resonance, cadence).", file: "services/geminiService.ts", method: "analyzeVoice()" },
+      { feature: "Visual Synthesis", model: googleModel("IMAGE_GEN"), role: "T2I / I2I Rendering", context: "Generates the cinematic keyframe.", file: "services/geminiService.ts", method: "generateImage()" },
+      { feature: "Cinematic Rendering", model: googleModel("VIDEO_GEN"), role: "Temporal Motion Synthesis", context: "The VEO video generation engine.", file: "services/geminiService.ts", method: "generateVideo()" },
       { feature: "Temporal Consistency", model: "N/A", role: "Prompt Logic", context: "Strict character and lighting stability directives.", file: "services/geminiService.ts", method: "wrapConsistencyPrompt()" }
     ];
   }
+
+  // const textModel = getEffectiveModel("openai", "SCRIPT_PARSER") || "(registry not loaded)";
+  // const imageModel = getEffectiveModel("openai", "IMAGE_GEN") || "(registry not loaded)";
+  // const transcribeModel = getEffectiveModel("openai", "DICTATION") || "(registry not loaded)";
+  // const ttsModel = getEffectiveModel("openai", "TTS_PREVIEW") || "(registry not loaded)";
+  // const videoModel = getEffectiveModel("openai", "VIDEO_GEN") || "(registry not loaded)";
+
 
   private static wrapConsistencyPrompt(basePrompt: string): string {
     return `[TEMPORAL CONSISTENCY RIGOROUS] ${basePrompt}. Maintain 100% identical character features, clothing textures, and environment lighting throughout the entire sequence. Ensure zero jitter and stable background objects. The sequence must look like a perfectly stitched high-budget film shot.`;
@@ -45,7 +59,7 @@ export class GeminiService {
     const clean = audioBase64.includes('base64,') ? audioBase64.split('base64,')[1] : audioBase64;
     
     const response = await ai.models.generateContent({
-      model: MODEL_REGISTRY.VOICE_ANALYZER,
+      model: googleModel("VOICE_ANALYZER"),
       contents: { 
         parts: [
           { inlineData: { data: clean, mimeType: 'audio/wav' } }, 
@@ -95,7 +109,7 @@ export class GeminiService {
     let operation;
     if (videoToExtend) {
       operation = await ai.models.generateVideos({
-        model: MODEL_REGISTRY.VIDEO_GEN,
+        model: googleModel("VIDEO_GEN"),
         prompt: `[DIRECTOR_EXTENSION_REQUEST] ${finalPrompt}. This is a continuation of the previous clip. Ensure identical vocal timbre and visual subjects.`,
         video: videoToExtend,
         config: { 
@@ -106,7 +120,7 @@ export class GeminiService {
       });
     } else {
       operation = await ai.models.generateVideos({
-        model: MODEL_REGISTRY.VIDEO_GEN,
+        model: googleModel("VIDEO_GEN"),
         prompt: finalPrompt,
         image: cleanStart ? { imageBytes: cleanStart, mimeType: 'image/png' } : undefined,
         config: { 
@@ -142,7 +156,7 @@ export class GeminiService {
     const ai = this.getAI();
 
     const response = await ai.models.generateContent({
-      model: MODEL_REGISTRY.TTS_PREVIEW,
+      model: googleModel("TTS_PREVIEW"),
       contents: [{ parts: [{ text: `Profile: ${traits}. Style: ${speed}. Script: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -170,7 +184,7 @@ export class GeminiService {
     if (!prompt.trim()) return { visuals: "", narration: "" };
     const ai = this.getAI();
     const response = await ai.models.generateContent({
-      model: MODEL_REGISTRY.SCRIPT_PARSER,
+      model: googleModel("SCRIPT_PARSER"),
       contents: prompt,
       config: {
         systemInstruction: "JSON output only. Split input into 'visuals' (camera/scene in []) and 'narration' (speech). If no visuals, create cinematic camera work. Ensure character names are consistent.",
@@ -189,7 +203,7 @@ export class GeminiService {
     const ai = this.getAI();
     const clean = audioBase64.includes('base64,') ? audioBase64.split('base64,')[1] : audioBase64;
     const response = await ai.models.generateContent({
-      model: MODEL_REGISTRY.DICTATION,
+      model: googleModel("DICTATION"),
       contents: { parts: [{ inlineData: { data: clean, mimeType: 'audio/wav' } }, { text: "Transcribe audio exactly." }] }
     });
     return response.text?.trim() || "";
@@ -198,7 +212,7 @@ export class GeminiService {
   static async generateImage(prompt: string, aspectRatio: AspectRatio = "9:16"): Promise<string | null> {
     const ai = this.getAI();
     const response = await ai.models.generateContent({
-      model: MODEL_REGISTRY.IMAGE_GEN,
+      model: googleModel("IMAGE_GEN"),
       contents: { parts: [{ text: `High-fidelity cinematic production keyframe: ${prompt}. Photo-realistic lighting.` }] },
       config: { imageConfig: { aspectRatio: aspectRatio as any } }
     });
