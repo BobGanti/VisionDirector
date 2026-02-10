@@ -1,1 +1,12 @@
-/* Optional overrides. Keep empty if not needed. */
+/* VisionDirector Light Mode (fast switch) */
+body.vd-light {
+  filter: invert(1) hue-rotate(180deg);
+  background: #ffffff;
+}
+
+/* Undo the invert for media so images/videos don’t look “negative” */
+body.vd-light img,
+body.vd-light video,
+body.vd-light canvas {
+  filter: invert(1) hue-rotate(180deg);
+}

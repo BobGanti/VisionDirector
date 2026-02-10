@@ -6,17 +6,13 @@ const App: React.FC = () => {
   const [isBridgeMode, setIsBridgeMode] = useState(false);
 
   useEffect(() => {
-    try {
-      const bridge = (window as any)?.aistudio;
-      if (bridge) setIsBridgeMode(true);
-    } catch {
-      // ignore
-    }
+    const bridge = (window as any).aistudio;
+    if (bridge) setIsBridgeMode(true);
   }, []);
 
   return (
     <ErrorBoundary>
-      <Studio isBridgeMode={isBridgeMode} />
+      <Studio isBridgeMode={isBridgeMode || !!(window as any).aistudio} />
     </ErrorBoundary>
   );
 };

@@ -250,6 +250,37 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     ];
   }, [registry]);
 
+    // -----------------------------
+  // Secure Vault (per-user, per-browser)
+  // -----------------------------
+  const [googleKey, setGoogleKey] = useState(
+    localStorage.getItem("vision_google_api_key_override") ||
+      localStorage.getItem("vision_api_key_override") ||
+      ""
+  );
+
+  const [openaiKey, setOpenaiKey] = useState(
+    localStorage.getItem("vision_openai_api_key_override") || ""
+  );
+
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleSaveKeys = () => {
+    // Store Google key in both names for backwards compatibility
+    localStorage.setItem("vision_google_api_key_override", googleKey.trim());
+    localStorage.setItem("vision_api_key_override", googleKey.trim());
+
+    // Store OpenAI key in the name OpenAIService expects
+    localStorage.setItem("vision_openai_api_key_override", openaiKey.trim());
+
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2500);
+
+    // Reload so services pick up the key immediately
+    window.location.reload();
+  };
+
+
   const RegistryPanel: React.FC<{ supplier: Supplier; title: string; accent: "emerald" | "violet" }> = ({
     supplier,
     title,
@@ -465,6 +496,7 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
 
           {/* Secure Vault Section (disabled here; keys are server-side in production) */}
+                    {/* Secure Vault Section */}
           <div className="p-8 bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <i className="fas fa-shield-halved text-6xl text-emerald-500"></i>
@@ -472,36 +504,95 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
             <div className="relative z-10">
               <div className="mb-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-2">Secure Vault</h3>
-                <p className="text-xl font-bold text-white uppercase tracking-tight">API Interface Credentials</p>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-2">
+                  Secure Vault
+                </h3>
+                <p className="text-xl font-bold text-white uppercase tracking-tight">
+                  API Interface Credentials
+                </p>
                 <p className="text-[10px] text-zinc-500 mt-1 uppercase font-medium">
-                  Keys are managed server-side (Secret Manager in production). No browser persistence.
+                  Paste your keys to use the app in this browser. Each user stores their own keys locally.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">Google (Gemini)</p>
-                  <input
-                    value="Managed by server"
-                    disabled
-                    className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-emerald-400 opacity-60 cursor-not-allowed"
-                  />
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Google */}
+                  <div className="flex-1">
+                    <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">
+                      Google (Gemini)
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={googleKey}
+                        onChange={(e) => setGoogleKey(e.target.value)}
+                        placeholder="Paste Google API key (raw key only)..."
+                        className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-emerald-400 focus:border-emerald-500/50 outline-none transition-all placeholder:text-zinc-700"
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+                        <i className="fas fa-key text-[10px] text-emerald-500/30"></i>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* OpenAI */}
+                  <div className="flex-1">
+                    <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">
+                      OpenAI
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        placeholder="Paste OpenAI API key (raw key only)..."
+                        className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-violet-300 focus:border-violet-500/50 outline-none transition-all placeholder:text-zinc-700"
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+                        <i className="fas fa-key text-[10px] text-violet-500/30"></i>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">OpenAI</p>
-                  <input
-                    value="Managed by server"
-                    disabled
-                    className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-violet-300 opacity-60 cursor-not-allowed"
-                  />
+                <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                  <div className="flex gap-4">
+                    <a
+                      href="https://ai.google.dev/gemini-api/docs/billing"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 hover:text-white transition-colors underline decoration-zinc-800"
+                    >
+                      Setup Gemini Billing
+                    </a>
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 hover:text-white transition-colors underline decoration-zinc-800"
+                    >
+                      Get OpenAI API Key
+                    </a>
+                  </div>
+
+                  <button
+                    onClick={handleSaveKeys}
+                    className={`px-8 h-12 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-3 ${
+                      isSaved
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white/5 hover:bg-white/10 text-white"
+                    }`}
+                  >
+                    <i className={`fas ${isSaved ? "fa-check" : "fa-sync"}`}></i>
+                    {isSaved ? "Keys Updated" : "Update Keys"}
+                  </button>
                 </div>
+
+                <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">
+                  Paste keys only. No labels. No quotes.
+                </p>
               </div>
-
-              <p className="mt-4 text-[9px] text-zinc-600 uppercase font-bold tracking-widest">
-                Local development: set GEMINI_API_KEY / OPENAI_API_KEY in your environment (or .env).
-              </p>
             </div>
           </div>
           {/* End Secure Vault */}
@@ -510,3 +601,4 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     </div>
   );
 };
+

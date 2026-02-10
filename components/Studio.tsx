@@ -68,6 +68,15 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showBlueprint, setShowBlueprint] = useState(false);
 
+  // Theme (Light/Dark)
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    document.body.classList.toggle("vd-light", theme === "light");
+    return () => document.body.classList.remove("vd-light");
+  }, [theme]);
+
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ai = getAIProvider(supplier as any);
 
@@ -370,8 +379,22 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
             <span className="text-[10px] font-black uppercase tracking-[0.3em]">VisionDirector Elite</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button onClick={() => setShowBlueprint(true)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
+              title={theme === "light" ? "Switch to Dark" : "Switch to Light"}
+              aria-label="Toggle theme"
+            >
+              <i className={`fa-solid ${theme === "light" ? "fa-moon" : "fa-sun"}`}></i>
+            </button>
+
+            <button
+              onClick={() => setShowBlueprint(true)}
+              className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all"
+              title="Model Blueprint"
+              aria-label="Open Model Blueprint"
+            >
               <i className="fa-solid fa-share-nodes"></i>
             </button>
           </div>
@@ -538,6 +561,6 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       </main>
     </div>
   );
-};
+}
 
 export default Studio;
