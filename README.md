@@ -1,8 +1,12 @@
-# VisionDirector — Knowledgebase (Text/Image → Video Studio)
+# VisionDirector 
+## Knowledgebase (Text/Image → Video Studio)
 
-VisionDirector is a compact studio app for turning **sequence prompts** plus optional **starting media** (images / videos / audio) into short videos, with optional **voice identity capture** and **model routing controls**.
+VisionDirector is a compact studio app for turning **sequence prompts** plus optional **starting media** (images / videos / audio) into short videos, with optional **voice identity capture** and **model routing controls** + optional sequence video extension.
 
-This document is written as a **knowledgebase**: it explains how to get started, how each feature works, and answers the questions people normally ask after first launch.
+This document is the **knowledgebase**: it explains how to get started, how each feature works, and answers the questions people normally ask after first launch.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENCE)
+© Bob Bobga Nti
 
 ---
 
@@ -497,18 +501,3 @@ High-value files (typical):
 - `shared/model_registry.json` — default models and capabilities
 
 ---
-
-## 18) Planned features
-
-These are explicitly planned for future releases:
-
-- **Branding / Logo management**
-  - upload a logo
-  - store it in the database
-  - display it consistently across desktop/mobile
-
-If you want to include a roadmap section with version numbers, add your intended release tags and I’ll format it.
-
----
-
-**Version note:** This knowledgebase reflects the current repository layout and the provided Dockerfile-based deployment.
