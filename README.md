@@ -326,7 +326,7 @@ VisionDirector includes a **Download** button for the final output.
 Typical behaviour:
 
 - If a rendered video is selected, Download saves it to your machine.
-- If no video is selected, the button may be disabled or show an error message.
+- If no video is selected, the button is disabled.
 
 If your browser blocks downloads, check permissions or try a different browser.
 
@@ -346,33 +346,12 @@ Endpoints:
 
 ---
 
-## 13) Data storage and security
-
-### 13.1 Database location
-
-Default:
-
-- `data/syntaxmatrixdir/db.sqlite`
-
-Optional override:
-
-- `DATABASE_PATH=/path/to/db.sqlite`
-
-### 13.2 What is stored
+## 13 What is stored
 
 - `app_settings` — supplier/theme/ui scale
 - `api_credentials` — encrypted supplier keys
 - `model_overrides` — per-supplier model overrides
 - `voice_identities` — saved identities
-
-### 13.3 Backups
-
-For production, back up:
-
-- `db.sqlite`
-- `.vd_master_key`
-
-Keep both together. The encrypted credentials depend on the master key.
 
 ---
 
@@ -412,10 +391,10 @@ Keep both together. The encrypted credentials depend on the master key.
 
 ## 15) Troubleshooting
 
-### “ai.analyseVoice is not a function”
-Cause: the provider method is named `analyzeVoice` (American spelling).
+### “API Key Error”
+Cause: If api key was saved `api key error` 
 
-Fix: change calls in `Studio.tsx` from `analyseVoice` to `analyzeVoice`, rebuild, then hard refresh.
+Fix: change calls in `refresh the browser`.
 
 ### Supplier changes not saved
 Checklist:
@@ -475,18 +454,3 @@ High-value files (typical):
 - `shared/model_registry.json` — default models and capabilities
 
 ---
-
-## 18) Planned features
-
-These are explicitly planned for future releases:
-
-- **Branding / Logo management**
-  - upload a logo
-  - store it in the database
-  - display it consistently across desktop/mobile
-
-If you want to include a roadmap section with version numbers, add your intended release tags and I’ll format it.
-
----
-
-**Version note:** This knowledgebase reflects the current repository layout and the provided Dockerfile-based deployment.
