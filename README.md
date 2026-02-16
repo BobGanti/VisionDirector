@@ -156,6 +156,11 @@ Typical render flow:
 
 ### 5.1 Controls (top bar)
 
+### Screenshot — Studio landing (desktop)
+
+![Studio landing (top)](docs/screenshots/01-1-studio-top.png)
+![Studio landing (bottom)](docs/screenshots/01-2-studio-bottom.png)
+
 You will see:
 
 - **Supplier**: Google / OpenAI
@@ -210,6 +215,13 @@ The Asset Vault is your working set of media. It supports:
 - Use the **hamburger button** to open it
 - Use the close button to dismiss it
 
+
+### Screenshot — Mobile Asset Vault drawer
+
+![Mobile vault drawer (top)](docs/screenshots/04-1-mobile-vault-top.png)
+![Mobile vault drawer (bottom)](docs/screenshots/04-2-mobile-vault-bottom.png)
+
+
 ### 6.3 Using assets during render
 
 - Active **image** → used as the starting frame (image-to-video)
@@ -253,6 +265,12 @@ This panel is where you store API keys safely.
 
 - Google API key
 - OpenAI API key
+
+
+### Screenshot — API Interface Credentials
+
+![API Interface Credentials](docs/screenshots/06-api-interface-credentials.png)
+
 
 ### 8.2 How it’s stored
 
@@ -323,10 +341,14 @@ The UI can play a short preview using:
 
 VisionDirector includes a **Download** button for the final output.
 
+### Screenshot — Final output + Download button
+
+![Final output and download](docs/screenshots/10-final-output-download.png)
+
 Typical behaviour:
 
 - If a rendered video is selected, Download saves it to your machine.
-- If no video is selected, the button is disabled.
+- If no video is selected, the button may be disabled or show an error message.
 
 If your browser blocks downloads, check permissions or try a different browser.
 
@@ -346,12 +368,33 @@ Endpoints:
 
 ---
 
-## 13 What is stored
+## 13) Data storage and security
+
+### 13.1 Database location
+
+Default:
+
+- `data/syntaxmatrixdir/db.sqlite`
+
+Optional override:
+
+- `DATABASE_PATH=/path/to/db.sqlite`
+
+### 13.2 What is stored
 
 - `app_settings` — supplier/theme/ui scale
 - `api_credentials` — encrypted supplier keys
 - `model_overrides` — per-supplier model overrides
 - `voice_identities` — saved identities
+
+### 13.3 Backups
+
+For production, back up:
+
+- `db.sqlite`
+- `.vd_master_key`
+
+Keep both together. The encrypted credentials depend on the master key.
 
 ---
 
@@ -391,10 +434,10 @@ Endpoints:
 
 ## 15) Troubleshooting
 
-### “API Key Error”
-Cause: If api key was saved `api key error` 
+### “ai.analyseVoice is not a function”
+Cause: the provider method is named `analyzeVoice` (American spelling).
 
-Fix: change calls in `refresh the browser`.
+Fix: change calls in `Studio.tsx` from `analyseVoice` to `analyzeVoice`, rebuild, then hard refresh.
 
 ### Supplier changes not saved
 Checklist:
@@ -454,3 +497,18 @@ High-value files (typical):
 - `shared/model_registry.json` — default models and capabilities
 
 ---
+
+## 18) Planned features
+
+These are explicitly planned for future releases:
+
+- **Branding / Logo management**
+  - upload a logo
+  - store it in the database
+  - display it consistently across desktop/mobile
+
+If you want to include a roadmap section with version numbers, add your intended release tags and I’ll format it.
+
+---
+
+**Version note:** This knowledgebase reflects the current repository layout and the provided Dockerfile-based deployment.
