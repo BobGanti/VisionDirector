@@ -1,412 +1,382 @@
 # VisionDirector — Knowledgebase (Text/Image → Video Studio)
 
-VisionDirector is a lightweight studio app for turning **sequence prompts** and **starting media** (images / videos / audio) into short videos, with optional **voice identity capture** and **model routing controls**.
+VisionDirector is a compact studio app for turning **sequence prompts** plus optional **starting media** (images / videos / audio) into short videos, with optional **voice identity capture** and **model routing controls**.
 
-This document is written as a **knowledgebase**: it explains *how to get started*, *how each feature works*, and answers common “what if…” questions.
+This document is written as a **knowledgebase**: it explains how to get started, how each feature works, and answers the questions people normally ask after first launch.
 
 ---
 
 ## Contents
 
-- [1) Quick start](#1-quick-start)
-- [2) How the app works](#2-how-the-app-works)
-- [3) Using the Studio](#3-using-the-studio)
-- [4) Asset Vault](#4-asset-vault)
-- [5) Supplier switching (Google/OpenAI)](#5-supplier-switching-googleopenai)
-- [6) API Interface Credentials (Secure Vault)](#6-api-interface-credentials-secure-vault)
-- [7) Model Blueprint (Model Map + overrides)](#7-model-blueprint-model-map--overrides)
-- [8) Voice identities](#8-voice-identities)
-- [9) Themes and UI scale](#9-themes-and-ui-scale)
-- [10) Data storage and security](#10-data-storage-and-security)
-- [11) Backend API reference](#11-backend-api-reference)
-- [12) Troubleshooting](#12-troubleshooting)
-- [13) FAQ](#13-faq)
-- [14) Repo structure](#14-repo-structure)
-- [15) Questions for you](#15-questions-for-you)
+- [1) Official deployment target: Docker](#1-official-deployment-target-docker)
+- [2) Quick start (Docker)](#2-quick-start-docker)
+- [3) Local development (optional)](#3-local-development-optional)
+- [4) How the app works](#4-how-the-app-works)
+- [5) Studio walkthrough](#5-studio-walkthrough)
+- [6) Asset Vault (desktop + mobile)](#6-asset-vault-desktop--mobile)
+- [7) Supplier switching (Google/OpenAI)](#7-supplier-switching-googleopenai)
+- [8) API Interface Credentials (Secure Vault)](#8-api-interface-credentials-secure-vault)
+- [9) Model Blueprint (Model Map + overrides)](#9-model-blueprint-model-map--overrides)
+- [10) Voice identities](#10-voice-identities)
+- [11) Downloading outputs](#11-downloading-outputs)
+- [12) Themes and UI scale](#12-themes-and-ui-scale)
+- [13) Data storage and security](#13-data-storage-and-security)
+- [14) Backend API reference](#14-backend-api-reference)
+- [15) Troubleshooting](#15-troubleshooting)
+- [16) FAQ](#16-faq)
+- [17) Repo structure](#17-repo-structure)
+- [18) Planned features](#18-planned-features)
 
 ---
 
-## 1) Quick start
+## 1) Official deployment target: Docker
 
-### Option A — Run with Python (Flask)
+Your **official** deployment target is **Docker**, using the provided multi-stage `Dockerfile`:
 
-1) Create a virtual environment and install dependencies:
+- Stage 1: builds the UI bundle (`npm run build`)
+- Stage 2: installs Python dependencies and runs the Flask app with **Gunicorn**:
+  - `gunicorn -b 0.0.0.0:${PORT:-8080} app:app`
 
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-
-pip install flask cryptography gunicorn
-```
-
-2) Start the server:
-
-```bash
-python app.py
-```
-
-3) Open:
-
-- `http://localhost:8080`
-
-> Note: `app.py` serves the compiled frontend and exposes the `/api/*` endpoints (settings, credentials, model overrides, voice identities).
+This is compatible with environments like **Google Cloud Run**, where the platform provides the `PORT` environment variable.
 
 ---
 
-### Option B — Run with Node (Express static host)
+## 2) Quick start (Docker)
 
-If you already have `node_modules/` present in your folder, you can run:
+### 2.1 Build
+
+From the repo root (where the `Dockerfile` is):
 
 ```bash
-node server.js
+docker build -t visiondirector .
+```
+
+### 2.2 Run (local)
+
+```bash
+docker run --rm -p 8080:8080 visiondirector
 ```
 
 Open:
 
 - `http://localhost:8080`
 
-> The Express server primarily serves static files and injects environment variables into the page. If you need the `/api/*` endpoints, run the Flask server instead.
+### 2.3 Persist your database + encryption key (recommended)
 
----
+VisionDirector stores settings and encrypted API credentials in SQLite. To keep these across container restarts, mount a volume.
 
-### Option C — Run in Docker (recommended for deployments)
+By default the app writes under:
 
-The repository contains a `Dockerfile` intended to build the UI and run the Python backend with Gunicorn.
+- `data/syntaxmatrixdir/db.sqlite`
+- `data/syntaxmatrixdir/.vd_master_key` (encryption master key)
 
-Typical usage (example):
-
-```bash
-docker build -t visiondirector .
-docker run -p 8080:8080 -e PORT=8080 visiondirector
-```
-
-For persistent storage, mount a volume and set `DATABASE_PATH`:
+Recommended run command:
 
 ```bash
-docker run -p 8080:8080 \
-  -e PORT=8080 \
-  -e DATABASE_PATH=/data/db.sqlite \
-  -v $(pwd)/data:/data \
-  visiondirector
+docker run --rm -p 8080:8080   -v "$(pwd)/data:/app/data"   visiondirector
 ```
 
----
+If you prefer an explicit database location:
 
-## 2) How the app works
+```bash
+docker run --rm -p 8080:8080   -e DATABASE_PATH=/app/data/syntaxmatrixdir/db.sqlite   -v "$(pwd)/data:/app/data"   visiondirector
+```
 
-VisionDirector has three moving parts:
+### 2.4 Cloud Run note
 
-1) **Studio UI** (React)
-   - The main screen where you type a sequence prompt, select supplier, choose aspect ratio, pick voice settings, and render.
+Cloud Run sets `PORT`. Your container command already binds to it:
 
-2) **Backend API** (Flask blueprint)
-   - Stores settings and secrets in SQLite.
-   - Exposes endpoints like `/api/settings/supplier`, `/api/credentials/*`, `/api/model-overrides/*`, `/api/voice-identities/*`.
+- `0.0.0.0:${PORT:-8080}`
 
-3) **AI provider services** (frontend “provider” layer)
-   - `services/geminiService.ts` (Google)
-   - `services/openaiService.ts` (OpenAI)
-   - `services/aiProvider.ts` chooses the provider based on your **Supplier** selection.
-
-A typical render cycle looks like this:
-
-1) You select a **Supplier** (Google/OpenAI).
-2) You enter or generate a **Sequence Narrative** (visuals + narration).
-3) You optionally choose an **image** as a starting frame, or a **video** to extend.
-4) The provider runs:
-   - Script parsing (optional, depending on your flow)
-   - Image generation (optional)
-   - Voice analysis (optional)
-   - Video generation (required)
-5) The output video is shown and added to your **Asset Vault**.
+So you normally do not need to set `PORT` yourself.
 
 ---
 
-## 3) Using the Studio
+## 3) Local development (optional)
 
-### 3.1 Studio controls (top bar)
+Docker is the official target. Local dev is useful for quick changes.
+
+### 3.1 Build the UI bundle
+
+The app serves a compiled `index.js`. When you edit `.tsx`, rebuild:
+
+```bash
+npm install
+npm run build
+```
+
+### 3.2 Run the Flask server
+
+```bash
+python app.py
+```
+
+Open:
+
+- `http://localhost:8080`
+
+> If you run a Node/Express static server, you may not have the full `/api/*` backend features unless that server also proxies to Flask.
+
+---
+
+## 4) How the app works
+
+VisionDirector has three layers:
+
+1) **Studio UI (React)**  
+   The main interface where you:
+   - pick a Supplier (Google/OpenAI)
+   - write your sequence prompt
+   - upload/select media in the Vault
+   - render video
+
+2) **Backend API (Flask)**  
+   Provides persistence and secure storage via `/api/*` endpoints:
+   - settings (supplier/theme/ui-scale)
+   - encrypted API credentials
+   - model overrides
+   - voice identities
+
+3) **Provider layer (frontend services)**  
+   Chooses a provider based on Supplier:
+   - Google provider: Gemini/Veo flow
+   - OpenAI provider: OpenAI models (including video generation where configured)
+
+Typical render flow:
+
+1) You choose Supplier + settings
+2) You provide a sequence prompt (and optionally a starting image/video/audio)
+3) The provider optionally parses prompt, optionally generates an image, optionally analyses voice
+4) The provider generates a video
+5) Output video appears in Preview and is added to the Vault
+
+---
+
+## 5) Studio walkthrough
+
+### 5.1 Controls (top bar)
 
 You will see:
 
-- **Supplier**: `Google` or `OpenAI`
-- **Speed**: voice delivery speed (slower → faster)
-- **Sentiment**: narration style (neutral, cinematic, aggressive, whispering, joyful, somber)
-- **Aspect**: typically `16:9` (landscape) or `9:16` (portrait)
+- **Supplier**: Google / OpenAI
+- **Speed**: narration delivery speed
+- **Sentiment**: narration style
+- **Aspect**: 9:16 portrait, 16:9 landscape, 1:1 square (depending on build options)
 
-These affect how your provider builds prompts and requests.
+These settings steer prompt formatting and which models are used.
 
-### 3.2 Sequence Narrative (main editor)
+### 5.2 Sequence Narrative (main editor)
 
-This is the primary input box. The recommended structure is:
-
-- **Visual direction**: in brackets, shot-by-shot
-- **Narration**: quoted line, or written plainly
+This is your primary input. A recommended style is shot directions plus narration.
 
 Example:
 
-```
+```text
 [Wide shot] A rain-soaked Dublin street at night. Neon reflections. Slow dolly-in.
-[Close-up] The protagonist checks a device, tense but calm.
+[Close-up] A developer checks system logs, focused and calm.
 
-"Narration: The future isn’t built in a sprint. It’s kept reliable in the long run."
+"Narration: AI pilots are easy. Keeping AI reliable is hard."
 ```
 
-If you want **silent** videos, omit narration or set it to an empty line.
+Tips:
 
-### 3.3 Execute Render
+- Shorter prompts are easier to iterate on.
+- If you want a silent video, omit narration.
 
-- If your selected asset is an **image** (or nothing), `Execute Render` generates a new video.
-- If your selected asset is a **video**, the UI switches into **Extension mode**, and the button becomes `Extend Sequence`.
+### 5.3 Execute Render
 
-In extension mode:
-- Your prompt should describe *what happens next*, continuing the previous clip.
-- The provider uses the previous video reference to extend and maintain continuity.
-
-### 3.4 Extension mode (what changes)
-
-Extension mode is detected when the active asset is a video with a `videoRef`.
-
-In this mode the UI:
-- Re-labels the prompt area (for continuation)
-- Uses the prior clip as `videoToExtend`
-- Uses a continuation prompt so the next segment matches the original
+- If your selected asset is an **image** (or none), the app generates a fresh video.
+- If your selected asset is a **video**, the app enters **Extension mode** (continue the clip).
 
 ---
 
-## 4) Asset Vault
+## 6) Asset Vault (desktop + mobile)
 
 The Asset Vault is your working set of media. It supports:
 
-- **Images**: used as starting frames for image-to-video
-- **Videos**: outputs and “extendable” clips
-- **Audio**: for dictation and voice analysis (where supported)
+- **Image uploads** (PNG/JPG/WebP)
+- **Video uploads** (MP4/MOV/WebM as supported by your browser/build)
+- **Audio uploads** (WAV/MP3/M4A as supported by your browser/build)
 
-### Desktop vs mobile
+### 6.1 Desktop behaviour
 
-- On desktop, the Asset Vault is a sidebar.
-- On mobile, it appears as a slide-out drawer (opened via the hamburger button).
+- Vault is visible as a panel
+- Selecting an item sets it as “active” for render or extension
+- Delete removes it from the vault list
 
-### Common Vault actions
+### 6.2 Mobile behaviour
 
-- **Upload**: add images/audio (and videos if your build supports it)
-- **Select**: sets an asset as the “active” one
-- **Delete**: removes it from the vault list
-- **Use in render**:
-  - Active image → used as the starting reference image (if supported by supplier)
-  - Active video → enables Extension mode
+- Vault is a **slide-out drawer**
+- Use the **hamburger button** to open it
+- Use the close button to dismiss it
+
+### 6.3 Using assets during render
+
+- Active **image** → used as the starting frame (image-to-video)
+- Active **video** → enables extension/continuation mode
+- Active **audio** → can be used for dictation/transcription and voice analysis (where supported)
 
 ---
 
-## 5) Supplier switching (Google/OpenAI)
+## 7) Supplier switching (Google/OpenAI)
 
-### What “Supplier” means
+Supplier determines the provider implementation and available models.
 
-Supplier controls which provider implementation is used:
+- **Google**: Gemini + Veo-style flow
+- **OpenAI**: OpenAI models (including video generation where configured)
 
-- **Google**: Gemini + Veo generation flow (`services/geminiService.ts`)
-- **OpenAI**: OpenAI models incl. Sora video (`services/openaiService.ts`)
+### 7.1 Default supplier
 
-### Default supplier
+The default supplier is stored in SQLite:
 
-The backend endpoint `/api/settings/supplier` provides the default supplier.
-If nothing has been saved yet, it returns **google** by default.
+- table: `app_settings`
+- key: `supplier`
+- values: `google` or `openai`
 
-### Persistence
+### 7.2 Persistence
 
-When you change supplier, the UI should POST to:
+On change, the UI posts:
 
 - `POST /api/settings/supplier` with `{ "supplier": "google" | "openai" }`
 
-The value is stored in SQLite:
+On launch, the UI reads:
 
-- Table: `app_settings`
-- Key: `supplier`
-
-### OpenAI video fallback
-
-When OpenAI video generation fails for content policy / moderation reasons, the OpenAI provider attempts a fallback to Google video generation (see `services/aiProvider.ts`).
-
-This behaviour is intentional so a single blocked request does not break your workflow.
+- `GET /api/settings/supplier`
 
 ---
 
-## 6) API Interface Credentials (Secure Vault)
+## 8) API Interface Credentials (Secure Vault)
 
-This panel lives inside **Model Blueprint** and is your “keys vault”.
+This panel is where you store API keys safely.
 
-### What it stores
+### 8.1 What you can store
 
-- Google API key (Gemini / Veo)
+- Google API key
 - OpenAI API key
 
-These are stored in SQLite **encrypted at rest**:
+### 8.2 How it’s stored
 
-- Table: `api_credentials`
-- Encryption: `cryptography.fernet` (see `data/credentials.py`)
-- Master key file: `data/syntaxmatrixdir/.vd_master_key`
+Credentials are stored in SQLite **encrypted at rest**:
 
-### Runtime key handling (important)
+- table: `api_credentials`
+- encryption: `cryptography.fernet`
+- master key file: `data/syntaxmatrixdir/.vd_master_key`
 
-Keys are:
-- stored securely in the database,
-- loaded into an **in-memory runtime store** in the frontend (not persistent storage),
-- then used by the provider services for API calls.
+> Treat the master key file as sensitive. If it changes, previously stored credentials cannot be decrypted.
 
-This is done by:
+### 8.3 How keys are used at runtime
 
-- `services/runtimeKeys.ts` → `warmRuntimeKeys()` / `refreshRuntimeKey()`
-- Endpoint: `GET /api/credentials/<supplier>`
-
-### Delete key
-
-Deleting a key calls:
-
-- `DELETE /api/credentials/<supplier>`
-
-This removes the encrypted entry from SQLite.
-
-### Security notes
-
-- Keys are never displayed back in the UI.
-- Keys should not be shipped in source control.
-- The master key file must be treated as sensitive.
+Keys are not permanently stored in the browser. The UI fetches keys when needed and keeps them in memory for provider calls.
 
 ---
 
-## 7) Model Blueprint (Model Map + overrides)
+## 9) Model Blueprint (Model Map + overrides)
 
-Model Blueprint is your “wiring console” for model selection.
+Model Blueprint is your “wiring panel” for model selection.
 
-It provides:
-- A live map of each capability (“agency key”) and which model is currently used.
-- Override fields to change models without code changes.
+### 9.1 Defaults vs overrides
 
-### How overrides work
+Defaults come from the shipped registry (e.g. `shared/model_registry.json`).
 
-- Defaults come from `shared/model_registry.json`
-- Overrides are stored in SQLite:
-  - Table: `model_overrides`
-  - Keys are per supplier, per agency key
+Overrides are stored in SQLite:
 
-An override value of:
-- **blank** means “use default”
-- any text means “use this exact model id”
+- table: `model_overrides`
+- keyed by `(supplier, model_key)`
 
-### Which parts can be overridden?
+If an override is blank, the app uses the default for that capability.
 
-Agency keys (typical):
+### 9.2 Reset to defaults
 
-- `SCRIPT_PARSER`
-- `DICTATION`
-- `VOICE_ANALYZER`
-- `AUTO_NARRATOR`
-- `IMAGE_GEN`
-- `VIDEO_GEN`
-- `TTS_PREVIEW`
-
-The provider uses:
-- override (if present), otherwise default
-
-### Reset to defaults
-
-Reset deletes all overrides for that supplier:
+Resets remove overrides for a supplier:
 
 - `POST /api/model-overrides/<supplier>/reset`
 
 ---
 
-## 8) Voice identities
+## 10) Voice identities
 
-Voice identities let you:
-- analyse a recorded voice to produce a reusable “voice DNA” text profile,
-- store it under a label,
-- and reuse it across renders.
+Voice identities allow you to analyse a recording and reuse its characteristics later.
 
-### Where it lives
+### 10.1 What is stored
 
-- Backend storage: SQLite table `voice_identities`
-- CRUD endpoints:
-  - `GET /api/voice-identities/<supplier>`
-  - `POST /api/voice-identities/<supplier>`
-  - `DELETE /api/voice-identities/<supplier>/<voice_id>`
+- label
+- base voice
+- traits (the “voice profile” text)
+- default speed
+- optional sentiment
 
-### What a voice identity contains
+### 10.2 Endpoints
 
-- `label`: your human-friendly name (stored upper-case)
-- `base_voice`: a base voice id (supplier-specific)
-- `traits`: the “voice DNA” / acoustic signature paragraph
-- `speed`: default speed for that identity
-- `sentiment`: optional default sentiment
+- `GET /api/voice-identities/<supplier>`
+- `POST /api/voice-identities/<supplier>`
+- `DELETE /api/voice-identities/<supplier>/<voice_id>`
 
-### Voice preview
+### 10.3 Preview
 
-The UI can trigger a short preview phrase using your selected voice settings.
-
-- For Google, preview uses TTS model and returns audio that the browser plays.
-- For OpenAI, preview uses the OpenAI TTS endpoint and plays audio in-browser.
+The UI can play a short preview using:
+- the selected base voice, or
+- a captured identity profile
 
 ---
 
-## 9) Themes and UI scale
+## 11) Downloading outputs
 
-These are stored as global settings in the same SQLite database.
+VisionDirector includes a **Download** button for the final output.
 
-### Theme
+Typical behaviour:
 
-- Values: `dark` or `light`
-- Endpoints:
-  - `GET /api/settings/theme`
-  - `POST /api/settings/theme`
+- If a rendered video is selected, Download saves it to your machine.
+- If no video is selected, the button may be disabled or show an error message.
 
-Stored in `app_settings` with key `theme`.
-
-### UI scale
-
-- Values: `normal` or `large`
-- Endpoints:
-  - `GET /api/settings/ui-scale`
-  - `POST /api/settings/ui-scale`
-
-Stored in `app_settings` with key `ui_scale`.
+If your browser blocks downloads, check permissions or try a different browser.
 
 ---
 
-## 10) Data storage and security
+## 12) Themes and UI scale
 
-### Where the database is
+These are stored in SQLite under `app_settings`:
 
-Default path:
+- theme: `dark` / `light`
+- ui_scale: `normal` / `large`
+
+Endpoints:
+
+- `GET /api/settings/theme` and `POST /api/settings/theme`
+- `GET /api/settings/ui-scale` and `POST /api/settings/ui-scale`
+
+---
+
+## 13) Data storage and security
+
+### 13.1 Database location
+
+Default:
 
 - `data/syntaxmatrixdir/db.sqlite`
 
-Override it with:
+Optional override:
 
-- `DATABASE_PATH=/absolute/or/relative/path/to/db.sqlite`
+- `DATABASE_PATH=/path/to/db.sqlite`
 
-### What is stored in SQLite
+### 13.2 What is stored
 
-- `app_settings` — supplier/theme/ui_scale
-- `model_overrides` — model override values per supplier
+- `app_settings` — supplier/theme/ui scale
 - `api_credentials` — encrypted supplier keys
-- `voice_identities` — stored voice profiles per supplier
+- `model_overrides` — per-supplier model overrides
+- `voice_identities` — saved identities
 
-### Encryption master key file
+### 13.3 Backups
 
-By default:
+For production, back up:
 
-- `data/syntaxmatrixdir/.vd_master_key`
+- `db.sqlite`
+- `.vd_master_key`
 
-Recovery behaviour:
-- If the master key file is missing but encrypted credentials exist, the app can regenerate a new master key and wipe credentials (meaning users must re-enter keys). See `data/credentials.py`.
+Keep both together. The encrypted credentials depend on the master key.
 
 ---
 
-## 11) Backend API reference
-
-Base paths are served by the Flask app:
+## 14) Backend API reference
 
 ### Settings
 
@@ -421,158 +391,102 @@ Base paths are served by the Flask app:
 
 ### Credentials
 
-- `GET    /api/credentials/status` → `{ status: { google: boolean, openai: boolean } }`
-- `POST   /api/credentials/<supplier>` → save key
-- `DELETE /api/credentials/<supplier>` → delete key
-- `GET    /api/credentials/<supplier>` → internal use (returns key to runtime store; do not show to users)
+- `GET    /api/credentials/status`
+- `POST   /api/credentials/<supplier>`
+- `DELETE /api/credentials/<supplier>`
+- `GET    /api/credentials/<supplier>` (internal use)
 
 ### Model overrides
 
-- `GET  /api/model-overrides/<supplier>` → keys/defaults/overrides
-- `POST /api/model-overrides/<supplier>` → save overrides
-- `POST /api/model-overrides/<supplier>/reset` → reset
+- `GET  /api/model-overrides/<supplier>`
+- `POST /api/model-overrides/<supplier>`
+- `POST /api/model-overrides/<supplier>/reset`
 
 ### Voice identities
 
-- `GET    /api/voice-identities/<supplier>` → list identities
-- `POST   /api/voice-identities/<supplier>` → create identity
-- `DELETE /api/voice-identities/<supplier>/<voice_id>` → delete
+- `GET    /api/voice-identities/<supplier>`
+- `POST   /api/voice-identities/<supplier>`
+- `DELETE /api/voice-identities/<supplier>/<voice_id>`
 
 ---
 
-## 12) Troubleshooting
+## 15) Troubleshooting
 
 ### “ai.analyseVoice is not a function”
-Cause: the method name is `analyzeVoice` (American spelling) in the provider interface.
+Cause: the provider method is named `analyzeVoice` (American spelling).
 
-Fix: replace `analyseVoice` with `analyzeVoice` in `components/Studio.tsx`, then rebuild your frontend bundle.
+Fix: change calls in `Studio.tsx` from `analyseVoice` to `analyzeVoice`, rebuild, then hard refresh.
 
----
-
-### “MISSING_API_KEY: Please add your Google key in API Interface Credentials.”
-Cause: you have not saved a key (or the runtime store has not been warmed).
-
-Fix:
-1) Open **Model Blueprint → API Interface Credentials**
-2) Paste and save the key
-3) Refresh the page
-
----
-
-### “OPENAI_API_KEY_MISSING”
-Cause: OpenAI runtime key is not available in memory.
-
-Fix: save the OpenAI key in **API Interface Credentials** and reload.
-
----
-
-### Supplier changes not “sticking”
-Supplier persistence is backend-driven (`app_settings.supplier`).
-
-If it keeps reverting, check:
-1) You are running the Flask server (to provide `/api/settings/supplier`)
-2) Your UI actually POSTs `/api/settings/supplier` on change
-3) You rebuilt `index.js` after making changes to `Studio.tsx`
-
----
-
-### Changes to `.tsx` not showing up in browser
-If your deployment serves a compiled `index.js`, any TSX changes require a rebuild.
-
+### Supplier changes not saved
 Checklist:
-- run your build step (Vite/esbuild)
-- hard refresh (Ctrl+F5)
-- confirm the server is serving the updated `index.js`
+
+1) You are running the Docker container (Gunicorn + Flask) or Flask locally
+2) `/api/settings/supplier` returns 200 in the browser network tab
+3) The database is on a persistent volume (if you expect it to persist across restarts)
+
+### TSX edits not showing up
+If you serve `index.js`, you must rebuild:
+
+```bash
+npm run build
+```
+
+Then restart your server/container.
+
+### “database is locked”
+This can happen if multiple processes compete for the same SQLite file. For containers, mount a local volume and avoid multiple replicas pointing to one sqlite file without a coordinating layer.
 
 ---
 
-### SQLite “database is locked”
-The DB connection enables WAL mode, but locks can still happen in some environments.
+## 16) FAQ
 
-Fixes:
-- put the database on a local disk/volume with proper file locking
-- avoid running multiple copies of the server pointing at the same sqlite file without coordination
-- keep DB on a mounted volume for containers, not inside an ephemeral layer
+### Does VisionDirector support video uploads?
+Yes. Video uploads are a first-class feature (alongside image and audio uploads).
 
----
+### Is branding/logo management available?
+Not yet. Branding is planned for a later release.
 
-### Voice preview does not play
-Common reasons:
-- Browser autoplay restrictions (needs a user click)
-- AudioContext suspended
-- Missing/invalid key
-
-Try:
-- click the preview button again
-- ensure the key is saved and valid
-- test in Chrome/Edge first
-
----
-
-## 13) FAQ
-
-### Is my API key stored in the browser?
-No. Keys are stored **encrypted in SQLite** and loaded into an in-memory runtime store at app start.
-
-There is a small “legacy cleanup” that removes old keys from localStorage if they existed from earlier builds.
-
-### Where are my settings saved?
-In SQLite table `app_settings` under keys like `supplier`, `theme`, and `ui_scale`.
-
-### Can multiple users have separate keys?
-Not yet. Current storage is instance-wide (single set of supplier keys per deployment).
-
-### Can I run without any keys at all?
-You can open the UI, but generation features will fail until a key is added.
-
-### What costs money?
-Calls to:
-- Google Gemini / Veo
-- OpenAI models (including video)
-
-You must enable billing in the relevant platform.
+### Where is the default supplier saved?
+In SQLite (`app_settings.supplier`).
 
 ### How do I reset everything?
 Stop the server and delete:
+
 - `data/syntaxmatrixdir/db.sqlite`
 - `data/syntaxmatrixdir/.vd_master_key`
 
-Restart and re-enter keys/settings.
-
-### Why does OpenAI sometimes “fall back” to Google video?
-If OpenAI video returns a moderation/policy block, VisionDirector tries to complete the request using Google video generation so you can keep working.
+Restart and re-enter your credentials.
 
 ---
 
-## 14) Repo structure
+## 17) Repo structure
 
-High-value files:
+High-value files (typical):
 
-- `components/Studio.tsx` — main Studio UI (supplier, narrative, vault, render)
-- `components/ModelMap.tsx` — Model Blueprint (secure vault + overrides)
-- `services/aiProvider.ts` — selects provider (google/openai) + fallback logic
-- `services/geminiService.ts` — Google generation, voice analysis, TTS preview
-- `services/openaiService.ts` — OpenAI generation, TTS, transcription, Sora
-- `services/modelOverrides.ts` — override storage API client
-- `services/runtimeKeys.ts` — runtime key cache (memory only)
-- `api/model_overrides.py` — Flask endpoints for settings/overrides/credentials/voices
-- `data/db.py` — sqlite connection and path management
+- `components/Studio.tsx` — main Studio UI
+- `components/ModelMap.tsx` — Model Blueprint (credentials + overrides)
+- `services/aiProvider.ts` — chooses provider and manages fallback
+- `services/geminiService.ts` — Google provider implementation
+- `services/openaiService.ts` — OpenAI provider implementation
+- `data/db.py` — SQLite connection and path management
 - `data/credentials.py` — encrypted key storage
-- `data/model_registry.py` — model registry + `app_settings` helpers
-- `data/voice_identities.py` — voice identity CRUD
-- `shared/model_registry.json` — default models per supplier
+- `data/model_registry.py` — model registry + overrides
+- `data/voice_identities.py` — voice identity storage
+- `shared/model_registry.json` — default models and capabilities
 
 ---
 
-## 15) Questions for you
+## 18) Planned features
 
-If you answer these, I can tighten this knowledgebase and make it match your exact build:
+These are explicitly planned for future releases:
 
-1) Which runtime is your “official” deployment target: **Flask**, **Node**, or **Docker**?
-2) Do you want the knowledgebase to describe **logo management** (it currently exists in some builds as browser-stored branding), or should we treat branding as “not implemented yet”?
-3) In the Asset Vault, do you want to officially support **video uploads**, or only video outputs + extension of generated clips?
-4) Should the app expose a “Download output” button as a first-class workflow, or is the vault list sufficient?
+- **Branding / Logo management**
+  - upload a logo
+  - store it in the database
+  - display it consistently across desktop/mobile
+
+If you want to include a roadmap section with version numbers, add your intended release tags and I’ll format it.
 
 ---
 
-**Version note:** This README reflects the code layout in `Vision_Director.zip` and the backend endpoints exposed via `api/model_overrides.py`.
+**Version note:** This knowledgebase reflects the current repository layout and the provided Dockerfile-based deployment.
