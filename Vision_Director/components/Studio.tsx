@@ -421,7 +421,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       let voiceTraits = '';
       if (activeAudio) {
         setStatus(AppStatus.GENERATING_AUDIO);
-        voiceTraits = await ai.analyzeVoice(activeAudio.url, sentiment);
+        voiceTraits = await ai.analyseVoice(activeAudio.url, sentiment);
         if (!script.narration) {
           script.narration = await ai.transcribeAudio(activeAudio.url);
         }
@@ -685,33 +685,19 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
       <main className="flex flex-col min-w-0 flex-none md:flex-1">
         <header className="h-14 px-4 md:px-6 flex items-center justify-between border-b border-white/5 bg-[var(--surface)]">
-          <div className="flex items-center gap-3">
-            {/* Mobile hamburger: opens Asset Vault */}
-            <button
-              type="button"
-              onClick={() => setVaultOpen(true)}
-              className="md:hidden w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition-all"
-              aria-label="Open Asset Vault"
-              title="Asset Vault"
-            >
-              <i className="fa-solid fa-bars text-[12px]"></i>
-            </button>
-
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all overflow-hidden ring-1 ring-white/10 ${
-                isExtensionMode ? 'bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-violet-600'
-              }`}
-              title="Logo (set in Model Blueprint → Secure Vault)"
-              aria-label="App logo"
-            >
-              {brandLogo ? (
-                <img src={brandLogo} alt="Logo" className="w-full h-full object-contain" />
-              ) : (
-                <i className={`fa-solid ${isExtensionMode ? 'fa-forward-step' : 'fa-clapperboard'} text-white text-[12px]`}></i>
-              )}
-            </div>
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all overflow-hidden ring-1 ring-white/10 ${
+              isExtensionMode ? 'bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-violet-600'
+            }`}
+            title="Logo (set in Model Blueprint → Secure Vault)"
+            aria-label="App logo"
+          >
+            {brandLogo ? (
+              <img src={brandLogo} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <i className={`fa-solid ${isExtensionMode ? 'fa-forward-step' : 'fa-clapperboard'} text-white text-[12px]`}></i>
+            )}
           </div>
-
 
           <div className="flex items-center gap-3">
             {/* Download (higher contrast in both dark + light) */}
