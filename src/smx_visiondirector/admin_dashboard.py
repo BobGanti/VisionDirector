@@ -66,6 +66,7 @@ def render_admin_dashboard_html(
             <a href="/visiondirector/admin#usage">Technical Diagnostics</a>
             <a href="/visiondirector/admin#models">Models</a>
             <a href="/visiondirector/admin#analytics">Analytics</a>
+            <a class="smx-vd-logout-link" href="/visiondirector/admin/logout">Logout</a>
           </nav>
         </div>
       </details>
