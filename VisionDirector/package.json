@@ -1,0 +1,20 @@
+{
+  "name": "vision-director-elite",
+  "version": "1.0.0",
+  "description": "Cinematic production suite for Cloud Run",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "esbuild index.tsx --bundle --outfile=index.js --format=esm --jsx=automatic --external:react --external:react/* --external:react-dom --external:react-dom/* --external:@google/genai",
+    "start": "node server.js"
+  }
+}

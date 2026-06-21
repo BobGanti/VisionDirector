@@ -148,3 +148,21 @@ body.vd-light.vd-fs-media img,
 body.vd-light.vd-fs-media canvas {
   filter: none !important;
 }
+
+/* smx-visiondirector native dropdown option readability */
+.vd-ui select option {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  font-weight: 700;
+}
+
+.vd-ui select option:checked {
+  color: #ffffff !important;
+  background-color: #6d28d9 !important;
+}
+
+.vd-ui select option:hover {
+  color: #111827 !important;
+  background-color: #e5e7eb !important;
+}
+

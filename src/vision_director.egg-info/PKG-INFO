@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: vision-director
+Version: 0.1.0
+Summary: VisionDirector plugin module for SyntaxMatrix host applications.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: Flask<4,>=3.0
+Provides-Extra: test
+Requires-Dist: pytest<9,>=8; extra == "test"
+
+# VisionDirector
+
+VisionDirector is being prepared as a pluggable SyntaxMatrix module.
+
+This package is installed into a host application's virtual environment in editable mode during development:
+
+```powershell
+python -m pip install -e ../VisionDirector
+```
+
+The host framework will later initialize it through a small customer-owned setup file under `plugins/vision_director/`.

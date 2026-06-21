@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/smx_visiondirector/__init__.py
+src/smx_visiondirector/smxcp.py
+src/smx_visiondirector.egg-info/PKG-INFO
+src/smx_visiondirector.egg-info/SOURCES.txt
+src/smx_visiondirector.egg-info/dependency_links.txt
+src/smx_visiondirector.egg-info/requires.txt
+src/smx_visiondirector.egg-info/top_level.txt
+tests/test_editable_package_contract.py
+tests/test_smx_visiondirector_plugin_contract.py
+tests/test_smxcp_contract.py

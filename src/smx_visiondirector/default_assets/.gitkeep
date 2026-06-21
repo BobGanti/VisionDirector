@@ -1,0 +1,2 @@
+Plugin developers may place default logo.png and favicon.png here.
+If either file is missing or empty, smxCP generates shaded PNG fallback assets.

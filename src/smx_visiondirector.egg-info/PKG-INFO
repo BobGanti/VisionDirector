@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: smx-visiondirector
+Version: 0.1.0
+Summary: VisionDirector pluggable module for SyntaxMatrix host applications.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: Flask<4,>=3.0
+Provides-Extra: test
+Requires-Dist: pytest<9,>=8; extra == "test"
+
+# VisionDirector
+
+VisionDirector is a pluggable SyntaxMatrix module.
+
+Host usage:
+
+```python
+from smx_visiondirector import setup_visiondirector
+
+setup_visiondirector(
+    app=app,
+    project_root=PROJECT_ROOT,
+    init_schema=True,
+    ai_profile=VISIONDIRECTOR_AGENTS_PROFILES,
+)
+```
+
+The host builds AI provider clients and passes them through `ai_profile`.
+VisionDirector must not instantiate model/provider clients independently.

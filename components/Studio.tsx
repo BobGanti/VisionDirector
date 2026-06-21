@@ -57,17 +57,18 @@ export const GOOGLE_VOICES: { id: VoiceProfile; label: string }[] = [
 ];
 
 export const OPENAI_VOICES: { id: VoiceProfile; label: string }[] = [
-  { id: 'alloy', label: 'ALLOY' },
-  { id: 'echo', label: 'ECHO' },
-  { id: 'fable', label: 'FABLE' },
-  { id: 'onyx', label: 'ONYX' },
-  { id: 'nova', label: 'NOVA' },
-  { id: 'shimmer', label: 'SHIMMER' },
-  { id: 'verse', label: 'VERSE' },
-  { id: 'ash', label: 'ASH' },
-  { id: 'sage', label: 'SAGE' },
-  { id: 'ballad', label: 'BALLAD' },
-  { id: 'coral', label: 'CORAL' },
+  // UI voice-presentation labels. Provider voice names remain unchanged.
+  { id: 'alloy', label: 'ALLOY (F)' },
+  { id: 'echo', label: 'ECHO (M)' },
+  { id: 'fable', label: 'FABLE (M)' },
+  { id: 'onyx', label: 'ONYX (M)' },
+  { id: 'nova', label: 'NOVA (F)' },
+  { id: 'shimmer', label: 'SHIMMER (F)' },
+  { id: 'verse', label: 'VERSE (M)' },
+  { id: 'ash', label: 'ASH (M)' },
+  { id: 'sage', label: 'SAGE (F)' },
+  { id: 'ballad', label: 'BALLAD (M)' },
+  { id: 'coral', label: 'CORAL (F)' },
 ];
 
 export const SUPPLIERS: { id: Supplier; uiLabel: string }[] = [
@@ -469,7 +470,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
 
     setStatus(AppStatus.GENERATING_AUDIO);
     try {
-      const traits = await ai.analyseVoice(activeAudio.url, sentiment);
+      const traits = await ai.analyzeVoice(activeAudio.url, sentiment);
 
       const res = await fetch(`/api/voice-identities/${supplier}`, {
         method: 'POST',
@@ -520,7 +521,7 @@ const Studio: React.FC<{ isBridgeMode?: boolean }> = ({ isBridgeMode = false }) 
       } else {
         let traits = '';
         if (activeAudio) {
-          traits = await ai.analyseVoice(activeAudio.url, sentiment);
+          traits = await ai.analyzeVoice(activeAudio.url, sentiment);
         }
         await ai.playVoicePreview(activeVoice, speechSpeed, traits, `Preview: ${String(activeVoice).toUpperCase()}.`);
       }
