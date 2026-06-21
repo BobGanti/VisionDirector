@@ -49,7 +49,7 @@ class FakeGoogleClient:
         self.models = FakeGoogleModels()
 
 
-def test_parse_script_uses_current_effective_script_parser_model(tmp_path):
+def test_parse_script_uses_host_provided_script_parser_llm(tmp_path):
     fake_client = FakeGoogleClient()
     app = Flask(__name__)
 
@@ -86,7 +86,7 @@ def test_parse_script_uses_current_effective_script_parser_model(tmp_path):
     )
 
     assert response.status_code == 200
-    assert fake_client.models.calls[-1]["model"] == "current-script-model"
+    assert fake_client.models.calls[-1]["model"] == "host-profile-fallback-model"
     assert "host-profile-fallback-model" not in response.get_data(as_text=True)
 
 

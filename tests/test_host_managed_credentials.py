@@ -134,9 +134,12 @@ def test_public_bundle_uses_host_managed_credential_language(tmp_path):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
 
-    assert "Host Provider Credentials" in body
-    assert "HOST READY" in body
-    assert "HOST MISSING" in body
+    assert "Host Provider Credentials" not in body
+    assert "Paste Google API key" not in body
+    assert "Paste OpenAI API key" not in body
+    assert "Delete Google Key" not in body
+    assert "Delete OpenAI Key" not in body
+    assert "Update Keys" not in body
     assert "API Interface Credentials" not in body
     assert "Please add your Google key" not in body
     assert "Please add your OpenAI key" not in body

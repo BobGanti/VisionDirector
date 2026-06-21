@@ -47,6 +47,9 @@ def _load_model_registry(project_root: Path) -> dict[str, Any]:
         project_root / "plugins" / "visiondirector" / "config" / "model_registry.json",
         project_root / "plugins" / "visiondirector" / "model_registry.json",
         project_root / "smx_visiondirector_model_registry.json",
+        project_root / "shared" / "model_registry.json",
+        project_root / "data" / "model_registry.json",
+        project_root / "data" / "model_registory.json",
         PACKAGE_ROOT / "model_registry.json",
     ]
 
@@ -798,6 +801,20 @@ def create_visiondirector_blueprint(
         return router.clean_api_payload(supplier)
 
 
+    @bp.post("/admin/model-overrides/<supplier>/reset")
+    def admin_model_overrides_reset(supplier: str):
+        guard = _require_admin_response()
+        if guard is not None:
+            return guard
+
+        supplier = supplier.strip().lower()
+        if supplier not in {"google", "openai"}:
+            return Response("Unsupported supplier.", status=400, mimetype="text/plain")
+
+        model_overrides_store[supplier] = {}
+        return redirect(url_for(".admin_dashboard") + "#models")
+
+
     @bp.get("/api/model-map/<supplier>")
     def current_model_map(supplier: str):
         supplier = supplier.strip().lower()
@@ -847,10 +864,7 @@ def create_visiondirector_blueprint(
         payload = request.get_json(silent=True) or {}
         supplier = str(payload.get("supplier") or settings_store["supplier"]).strip().lower()
         prompt = str(payload.get("prompt") or "").strip()
-        model = (
-            str(payload.get("model") or "").strip()
-            or _resolve_current_model("SCRIPT_PARSER", supplier)
-        )
+        model = _resolve_current_model("SCRIPT_PARSER", supplier)
 
         if supplier not in {"google", "openai"}:
             return {"error": "unsupported supplier"}, 400
@@ -880,7 +894,7 @@ def create_visiondirector_blueprint(
             "visuals": parsed["visuals"],
             "narration": parsed["narration"],
             "supplier": result.provider,
-            "model": result.model,
+            "model": "host_llm",
         }
 
 
@@ -1174,6 +1188,120 @@ def create_visiondirector_blueprint(
             "model": result.model,
             "jobId": job_id,
         }
+
+
+    def _delete_usage_event_by_id(event_id: str) -> bool:
+        event_id = str(event_id or "").strip()
+        if not event_id:
+            return False
+
+        # SQLite usage recorder.
+        storage_obj = getattr(resolved_usage_recorder, "storage", None)
+        config_obj = getattr(storage_obj, "config", None)
+        sqlite_path = getattr(config_obj, "sqlite_path", None)
+        if sqlite_path is not None:
+            import sqlite3
+
+            with sqlite3.connect(sqlite_path) as conn:
+                cursor = conn.execute(
+                    "DELETE FROM visiondirector_usage_events WHERE id = ?",
+                    (event_id,),
+                )
+                return cursor.rowcount > 0
+
+        # JSONL usage recorder.
+        path_obj = getattr(resolved_usage_recorder, "path", None)
+        if path_obj is not None:
+            path = Path(path_obj)
+            if not path.exists():
+                return False
+
+            kept: list[str] = []
+            deleted = False
+            for raw_line in path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    kept.append(raw_line)
+                    continue
+
+                if str(payload.get("event_id") or "") == event_id:
+                    deleted = True
+                    continue
+                kept.append(raw_line)
+
+            path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+            return deleted
+
+        # In-memory usage recorder.
+        events_obj = getattr(resolved_usage_recorder, "_events", None)
+        if isinstance(events_obj, list):
+            before = len(events_obj)
+            events_obj[:] = [
+                event for event in events_obj
+                if str(getattr(event, "event_id", "")) != event_id
+            ]
+            return len(events_obj) != before
+
+        return False
+
+
+    def _clear_usage_events() -> int:
+        # SQLite usage recorder.
+        storage_obj = getattr(resolved_usage_recorder, "storage", None)
+        config_obj = getattr(storage_obj, "config", None)
+        sqlite_path = getattr(config_obj, "sqlite_path", None)
+        if sqlite_path is not None:
+            import sqlite3
+
+            with sqlite3.connect(sqlite_path) as conn:
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM visiondirector_usage_events"
+                ).fetchone()[0]
+                conn.execute("DELETE FROM visiondirector_usage_events")
+                return int(count or 0)
+
+        # JSONL usage recorder.
+        path_obj = getattr(resolved_usage_recorder, "path", None)
+        if path_obj is not None:
+            path = Path(path_obj)
+            if not path.exists():
+                return 0
+            count = len([line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()])
+            path.write_text("", encoding="utf-8")
+            return count
+
+        # In-memory usage recorder.
+        events_obj = getattr(resolved_usage_recorder, "_events", None)
+        if isinstance(events_obj, list):
+            count = len(events_obj)
+            events_obj.clear()
+            return count
+
+        return 0
+
+
+    @bp.post("/admin/usage-events/<event_id>/delete")
+    def admin_usage_event_delete(event_id: str):
+        guard = _require_admin_response()
+        if guard is not None:
+            return guard
+
+        _delete_usage_event_by_id(event_id)
+        return redirect(url_for(".admin_dashboard") + "#events")
+
+
+    @bp.post("/admin/usage-events/clear")
+    def admin_usage_events_clear():
+        guard = _require_admin_response()
+        if guard is not None:
+            return guard
+
+        _clear_usage_events()
+        return redirect(url_for(".admin_dashboard") + "#events")
 
 
     @bp.get("/api/usage/report")

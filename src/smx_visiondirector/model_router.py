@@ -17,6 +17,12 @@ DEFAULT_TASK_ORDER = [
 ]
 
 
+HOST_LLM_ONLY_TASKS = {
+    "SCRIPT_PARSER",
+    "AUTO_NARRATOR",
+}
+
+
 @dataclass(frozen=True)
 class ResolvedModel:
     supplier: str
@@ -29,9 +35,9 @@ class ModelRouter:
     """Resolves the current effective model for a supplier/task pair.
 
     Resolution order:
-    1. Admin override for supplier + task
-    2. Plugin default registry model
-    3. Host profile model fallback
+    1. Host profile model for host-LLM-only text tasks
+    2. Admin override for specialist supplier + task
+    3. Specialist default registry model
 
     The public model map is intentionally clean: it exposes only the current
     effective model. It does not expose previous/current comparisons.
@@ -65,6 +71,16 @@ class ModelRouter:
         clean_supplier = _clean_supplier(supplier)
         clean_task = _clean_task(task)
 
+        if clean_task in HOST_LLM_ONLY_TASKS:
+            profile = self.profile_registry.get_provider(clean_supplier)
+            host_model = profile.model if profile else None
+            return ResolvedModel(
+                supplier=clean_supplier,
+                task=clean_task,
+                model=host_model or "",
+                source="host_profile" if host_model else "missing",
+            )
+
         override = self._supplier_overrides(clean_supplier).get(clean_task)
         if override:
             return ResolvedModel(
@@ -83,13 +99,11 @@ class ModelRouter:
                 source="default",
             )
 
-        profile = self.profile_registry.get_provider(clean_supplier)
-        fallback = profile.model if profile else None
         return ResolvedModel(
             supplier=clean_supplier,
             task=clean_task,
-            model=fallback or "",
-            source="host_profile" if fallback else "missing",
+            model="",
+            source="missing",
         )
 
     def current_map(self, supplier: str) -> dict[str, dict[str, str]]:

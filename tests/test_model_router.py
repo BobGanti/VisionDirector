@@ -8,7 +8,7 @@ class FakeClient:
     pass
 
 
-def test_model_router_resolves_override_default_then_host_profile():
+def test_model_router_resolves_host_llm_then_specialist_override_default():
     registry = build_ai_profile_registry(
         {
             "main": {
@@ -38,14 +38,17 @@ def test_model_router_resolves_override_default_then_host_profile():
         },
     )
 
-    assert router.resolve("google", "SCRIPT_PARSER").model == "default-script-model"
-    assert router.resolve("google", "SCRIPT_PARSER").source == "default"
+    assert router.resolve("google", "SCRIPT_PARSER").model == "host-fallback-model"
+    assert router.resolve("google", "SCRIPT_PARSER").source == "host_profile"
 
     assert router.resolve("google", "IMAGE_GEN").model == "new-image-model"
     assert router.resolve("google", "IMAGE_GEN").source == "override"
 
-    assert router.resolve("google", "VIDEO_GEN").model == "host-fallback-model"
-    assert router.resolve("google", "VIDEO_GEN").source == "host_profile"
+    assert router.resolve("google", "AUTO_NARRATOR").model == "host-fallback-model"
+    assert router.resolve("google", "AUTO_NARRATOR").source == "host_profile"
+
+    assert router.resolve("google", "VIDEO_GEN").model == ""
+    assert router.resolve("google", "VIDEO_GEN").source == "missing"
 
 
 def test_clean_payload_exposes_only_current_effective_models():

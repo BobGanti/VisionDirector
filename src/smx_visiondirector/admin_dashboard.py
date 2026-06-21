@@ -86,28 +86,45 @@ def render_admin_dashboard_html(
 
 
 
-<section class="smx-vd-panel smx-vd-crud-roadmap" id="admin-crud">
+<section class="smx-vd-panel smx-vd-admin-controls" id="admin-crud">
   <div class="smx-vd-panel-header">
     <div>
       <h2>Admin Management</h2>
-      <p>CRUD controls for VisionDirector configuration and operations.</p>
+      <p>Operational controls for model routing, voice identities, render jobs, and usage reports.</p>
     </div>
   </div>
+
   <div class="smx-vd-management-grid">
-    <article class="smx-vd-card">
+    <article class="smx-vd-card smx-vd-control-card">
       <p class="smx-vd-card-label">Model Overrides</p>
-      <p class="smx-vd-card-value">Next</p>
-      <p class="smx-vd-card-note">Create, update, reset, and delete model overrides per supplier and task.</p>
+      <p class="smx-vd-card-value">Manage</p>
+      <p class="smx-vd-card-note">Reset supplier model overrides back to the current host/default model map.</p>
+      <div class="smx-vd-control-actions">
+        <form method="post" action="/visiondirector/admin/model-overrides/google/reset">
+          <button class="smx-vd-button smx-vd-admin-action" type="submit">Reset Google Models</button>
+        </form>
+        <form method="post" action="/visiondirector/admin/model-overrides/openai/reset">
+          <button class="smx-vd-button is-secondary smx-vd-admin-action" type="submit">Reset OpenAI Models</button>
+        </form>
+      </div>
     </article>
-    <article class="smx-vd-card">
+
+    <article class="smx-vd-card smx-vd-control-card">
       <p class="smx-vd-card-label">Voice Identities</p>
-      <p class="smx-vd-card-value">Planned</p>
-      <p class="smx-vd-card-note">Create, edit, enable, disable, and remove reusable voice identities.</p>
+      <p class="smx-vd-card-value">Manage</p>
+      <p class="smx-vd-card-note">Review saved voice identities and remove unusable voices from the voice section.</p>
+      <div class="smx-vd-control-actions">
+        <a class="smx-vd-button is-secondary" href="/visiondirector/admin#voices">Go to Voices</a>
+      </div>
     </article>
-    <article class="smx-vd-card">
+
+    <article class="smx-vd-card smx-vd-control-card">
       <p class="smx-vd-card-label">Render Jobs</p>
-      <p class="smx-vd-card-value">Planned</p>
-      <p class="smx-vd-card-note">View, filter, retry, archive, or delete render and generation jobs.</p>
+      <p class="smx-vd-card-value">Monitor</p>
+      <p class="smx-vd-card-note">Review generation jobs, errors, and provider video references.</p>
+      <div class="smx-vd-control-actions">
+        <a class="smx-vd-button is-secondary" href="/visiondirector/admin#render-jobs">Go to Render Jobs</a>
+      </div>
     </article>
   </div>
 </section>
@@ -222,12 +239,15 @@ def render_admin_dashboard_html(
           <div class="smx-vd-panel-header">
             <div>
               <h3>Recent Token Events</h3>
-              <p>Latest normalized token events. No raw prompts or secrets are stored in this report.</p>
+              <p>Latest normalized token events. No raw prompts or secrets are stored in this report. The dashboard shows the latest 25 events; admins can delete individual rows or clear the event log.</p>
             </div>
+            <form method="post" action="/visiondirector/admin/usage-events/clear" onsubmit="return confirm('Clear all token events? This cannot be undone.');">
+              <button class="smx-vd-button is-secondary smx-vd-danger-action" type="submit">Clear All Token Events</button>
+            </form>
           </div>
           <div class="smx-vd-table-wrap">
             <table class="smx-vd-table">
-              <thead><tr><th>Operation</th><th>Provider</th><th>Model</th><th>Status</th><th>Total</th><th>Input</th><th>Output</th></tr></thead>
+              <thead><tr><th>Operation</th><th>Provider</th><th>Model</th><th>Status</th><th>Total</th><th>Input</th><th>Output</th><th>Action</th></tr></thead>
               <tbody>{event_rows}</tbody>
             </table>
           </div>
@@ -237,6 +257,68 @@ def render_admin_dashboard_html(
   </main>
 </body>
 </html>'''
+
+
+
+def _executive_analytics_cards(profile_summary: dict[str, Any], usage_report: dict[str, Any]) -> str:
+    providers = profile_summary.get("providers") or {}
+    available_count = sum(
+        1
+        for provider in providers.values()
+        if provider.get("available") or provider.get("hasClient")
+    )
+    provider_count = len(providers) or 2
+
+    total_calls = int(usage_report.get("total_calls") or 0)
+    total_tokens = int(usage_report.get("total_tokens") or 0)
+    events = usage_report.get("events") or []
+    failed_events = [
+        event for event in events
+        if str(event.get("status") or "").lower() not in {"ok", "success", "completed"}
+    ]
+
+    total_events = len(events)
+    successful_events = total_events - len(failed_events)
+    success_rate = (
+        f"{round((successful_events / total_events) * 100)}%"
+        if total_events
+        else "No Events"
+    )
+
+    by_operation = usage_report.get("by_operation") or {}
+    if by_operation:
+        most_used_name, most_used_payload = max(
+            by_operation.items(),
+            key=lambda item: int((item[1] or {}).get("calls") or 0),
+        )
+        most_used_calls = int((most_used_payload or {}).get("calls") or 0)
+        most_used_operation = str(most_used_name) if most_used_calls else "No Activity"
+    else:
+        most_used_operation = "No Activity"
+
+    status_value = "Ready" if available_count else "Needs Setup"
+
+    cards = [
+        ("System Status", status_value, "Operational readiness based on host-managed provider availability."),
+        ("Provider Readiness", f"{available_count}/{provider_count}", "Host-managed providers currently available to VisionDirector."),
+        ("AI Activity", _num(total_calls), "Total recorded model calls across supported operations."),
+        ("Success Rate", success_rate, "Share of recent token events that completed successfully."),
+        ("Most Used Operation", most_used_operation, "Most frequent recorded AI operation."),
+        ("Token Volume", _num(total_tokens), "Provider-reported token usage counts only; monetary estimates are not shown."),
+        ("Operational Exceptions", _num(len(failed_events)), "Recent recorded events that did not complete successfully."),
+    ]
+
+    rows: list[str] = []
+    for label, value, note in cards:
+        rows.append(
+            "<article class='smx-vd-card'>"
+            f"<p class='smx-vd-card-label'>{_safe(label)}</p>"
+            f"<p class='smx-vd-card-value'>{_safe(value)}</p>"
+            f"<p class='smx-vd-card-note'>{_safe(note)}</p>"
+            "</article>"
+        )
+
+    return "".join(rows)
 
 
 def _group_rows(groups: dict[str, Any]) -> str:
@@ -261,11 +343,24 @@ def _group_rows(groups: dict[str, Any]) -> str:
 
 def _event_rows(events: list[dict[str, Any]]) -> str:
     if not events:
-        return '<tr><td colspan="7" class="smx-vd-empty">No token events recorded yet.</td></tr>'
+        return '<tr><td colspan="8" class="smx-vd-empty">No token events recorded yet.</td></tr>'
 
     rows: list[str] = []
     for event in list(reversed(events))[:25]:
         status = _safe(event.get("status") or "unknown")
+        event_id = _safe(event.get("event_id") or "")
+
+        if event_id:
+            action_html = (
+                '<form method="post" '
+                'onsubmit="return confirm(&quot;Delete this token event? This cannot be undone.&quot;);" '
+                f'action="/visiondirector/admin/usage-events/{event_id}/delete">'
+                '<button class="smx-vd-row-action smx-vd-danger-action" type="submit">Delete</button>'
+                '</form>'
+            )
+        else:
+            action_html = '<span class="smx-vd-muted">Unavailable</span>'
+
         rows.append(
             "<tr>"
             f"<td data-label='Operation'>{_safe(event.get('operation'))}</td>"
@@ -275,73 +370,10 @@ def _event_rows(events: list[dict[str, Any]]) -> str:
             f"<td data-label='Total'>{_num(event.get('total_tokens'))}</td>"
             f"<td data-label='Input'>{_num(event.get('input_tokens'))}</td>"
             f"<td data-label='Output'>{_num(event.get('output_tokens'))}</td>"
+            f"<td data-label='Action'>{action_html}</td>"
             "</tr>"
         )
     return "".join(rows)
-
-
-
-def _executive_analytics_cards(
-    profile_summary: dict[str, Any],
-    usage_report: dict[str, Any],
-) -> str:
-    events = usage_report.get("events") or []
-    providers = profile_summary.get("providers") or {}
-
-    ready_providers = sum(
-        1 for payload in providers.values()
-        if isinstance(payload, dict) and payload.get("hasClient")
-    )
-    total_providers = len(providers)
-
-    if total_providers:
-        provider_readiness = f"{ready_providers}/{total_providers} ready"
-        provider_note = "Host-managed AI providers available to the plugin"
-    else:
-        provider_readiness = "No profiles"
-        provider_note = "Host AI profiles have not been connected yet"
-
-    total_calls = int(usage_report.get("total_calls") or 0)
-
-    if events:
-        success_count = sum(
-            1 for event in events
-            if str(event.get("status") or "").lower() == "success"
-        )
-        success_rate = f"{round((success_count / len(events)) * 100)}%"
-        success_note = f"{success_count}/{len(events)} recent AI operations succeeded"
-    else:
-        success_rate = "No runs yet"
-        success_note = "No AI activity has been recorded yet"
-
-    by_operation = usage_report.get("by_operation") or {}
-    if by_operation:
-        busiest_operation, busiest_payload = max(
-            by_operation.items(),
-            key=lambda item: int((item[1] or {}).get("calls") or 0),
-        )
-        busiest_value = _safe(busiest_operation)
-        busiest_note = f"{_num((busiest_payload or {}).get('calls'))} recorded calls"
-    else:
-        busiest_value = "No activity yet"
-        busiest_note = "Operations will appear after the first AI run"
-
-    cards = [
-        ("System Status", "Online", "VisionDirector admin console is responding"),
-        ("Provider Readiness", provider_readiness, provider_note),
-        ("AI Activity", _num(total_calls), "Total recorded plugin AI operations"),
-        ("Success Rate", success_rate, success_note),
-        ("Most Used Operation", busiest_value, busiest_note),
-    ]
-
-    return "".join(
-        '<article class="smx-vd-card smx-vd-analytics-card">'
-        f'<p class="smx-vd-card-label">{_safe(label)}</p>'
-        f'<p class="smx-vd-card-value">{value}</p>'
-        f'<p class="smx-vd-card-note">{_safe(note)}</p>'
-        '</article>'
-        for label, value, note in cards
-    )
 
 
 def _profile_cards(profile_summary: dict[str, Any]) -> str:

@@ -193,61 +193,77 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       return ov || safeTrim(s?.defaults?.[key] ?? "");
     };
 
+    const hostLlmKeys = new Set(["SCRIPT_PARSER", "AUTO_NARRATOR"]);
+
+    const displayModel = (supplier: Supplier, key: string): string => {
+      const model = effectiveModel(supplier, key);
+      if (hostLlmKeys.has(key)) {
+        return model ? `Host LLM: ${model}` : "Host LLM not configured";
+      }
+      return model || "Not configured — specialist capability required";
+    };
+
+    const capabilityContext = (key: string): string => {
+      return hostLlmKeys.has(key)
+        ? `Host LLM capability key: ${key}`
+        : `Specialist capability key: ${key}`;
+    };
+
     return [
       // Google
       {
         feature: "Google — Script Parser",
-        model: effectiveModel("google", "SCRIPT_PARSER") || "—",
+        model: displayModel("google", "SCRIPT_PARSER"),
         role: "Prompt → structured script",
-        context: "Agency key: SCRIPT_PARSER",
+        context: capabilityContext("SCRIPT_PARSER"),
         file: "shared/model_registry.json",
         method: "SCRIPT_PARSER",
       },
       {
         feature: "Google — Dictation",
-        model: effectiveModel("google", "DICTATION") || "—",
+        model: displayModel("google", "DICTATION"),
         role: "Audio → text",
-        context: "Agency key: DICTATION",
+        context: capabilityContext("DICTATION"),
         file: "shared/model_registry.json",
         method: "DICTATION",
       },
       {
         feature: "Google — Voice Analyser",
-        model: effectiveModel("google", "VOICE_ANALYZER") || "—",
+        model: displayModel("google", "VOICE_ANALYZER"),
         role: "Voice traits inference",
-        context: "Agency key: VOICE_ANALYZER",
+        context: capabilityContext("VOICE_ANALYZER"),
         file: "shared/model_registry.json",
         method: "VOICE_ANALYZER",
       },
       {
         feature: "Google — Auto Narrator",
-        model: effectiveModel("google", "AUTO_NARRATOR") || "—",
+        model: displayModel("google", "AUTO_NARRATOR"),
         role: "Narration generation",
-        context: "Agency key: AUTO_NARRATOR",
+        context: capabilityContext("AUTO_NARRATOR"),
         file: "shared/model_registry.json",
         method: "AUTO_NARRATOR",
       },
       {
         feature: "Google — Image Gen",
-        model: effectiveModel("google", "IMAGE_GEN") || "—",
+        model: displayModel("google", "IMAGE_GEN"),
         role: "Text/image → image",
-        context: "Agency key: IMAGE_GEN",
+        context: capabilityContext("IMAGE_GEN"),
         file: "shared/model_registry.json",
         method: "IMAGE_GEN",
       },
       {
         feature: "Google — Video Gen",
-        model: effectiveModel("google", "VIDEO_GEN") || "—",
+        model: displayModel("google", "VIDEO_GEN"),
         role: "Text/image → video",
-        context: "Agency key: VIDEO_GEN",
+        context: capabilityContext("VIDEO_GEN"),
         file: "shared/model_registry.json",
         method: "VIDEO_GEN",
       },
       {
         feature: "Google — TTS Preview",
-        model: effectiveModel("google", "TTS_PREVIEW") || "—",
+        model: displayModel("google", "TTS_PREVIEW"),
         role: "Voice preview",
-        context: "Agency key: TTS_PREVIEW",
+        context: capabilityContext("TTS_PREVIEW"),
         file: "shared/model_registry.json",
         method: "TTS_PREVIEW",
       },
@@ -255,57 +271,57 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       // OpenAI (if/when wired)
       {
         feature: "OpenAI — Script Parser",
-        model: effectiveModel("openai", "SCRIPT_PARSER") || "—",
+        model: displayModel("openai", "SCRIPT_PARSER"),
         role: "Prompt → structured script",
-        context: "Agency key: SCRIPT_PARSER",
+        context: capabilityContext("SCRIPT_PARSER"),
         file: "shared/model_registry.json",
         method: "SCRIPT_PARSER",
       },
       {
         feature: "OpenAI — Dictation",
-        model: effectiveModel("openai", "DICTATION") || "—",
+        model: displayModel("openai", "DICTATION"),
         role: "Audio → text",
-        context: "Agency key: DICTATION",
+        context: capabilityContext("DICTATION"),
         file: "shared/model_registry.json",
         method: "DICTATION",
       },
       {
         feature: "OpenAI — Voice Analyser",
-        model: effectiveModel("openai", "VOICE_ANALYZER") || "—",
+        model: displayModel("openai", "VOICE_ANALYZER"),
         role: "Voice traits inference",
-        context: "Agency key: VOICE_ANALYZER",
+        context: capabilityContext("VOICE_ANALYZER"),
         file: "shared/model_registry.json",
         method: "VOICE_ANALYZER",
       },
       {
         feature: "OpenAI — Auto Narrator",
-        model: effectiveModel("openai", "AUTO_NARRATOR") || "—",
+        model: displayModel("openai", "AUTO_NARRATOR"),
         role: "Narration generation",
-        context: "Agency key: AUTO_NARRATOR",
+        context: capabilityContext("AUTO_NARRATOR"),
         file: "shared/model_registry.json",
         method: "AUTO_NARRATOR",
       },
       {
         feature: "OpenAI — Image Gen",
-        model: effectiveModel("openai", "IMAGE_GEN") || "—",
+        model: displayModel("openai", "IMAGE_GEN"),
         role: "Text/image → image",
-        context: "Agency key: IMAGE_GEN",
+        context: capabilityContext("IMAGE_GEN"),
         file: "shared/model_registry.json",
         method: "IMAGE_GEN",
       },
       {
         feature: "OpenAI — Video Gen",
-        model: effectiveModel("openai", "VIDEO_GEN") || "—",
+        model: displayModel("openai", "VIDEO_GEN"),
         role: "Text/image → video",
-        context: "Agency key: VIDEO_GEN",
+        context: capabilityContext("VIDEO_GEN"),
         file: "shared/model_registry.json",
         method: "VIDEO_GEN",
       },
       {
         feature: "OpenAI — TTS Preview",
-        model: effectiveModel("openai", "TTS_PREVIEW") || "—",
+        model: displayModel("openai", "TTS_PREVIEW"),
         role: "Voice preview",
-        context: "Agency key: TTS_PREVIEW",
+        context: capabilityContext("TTS_PREVIEW"),
         file: "shared/model_registry.json",
         method: "TTS_PREVIEW",
       },
@@ -319,9 +335,10 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [openaiKey, setOpenaiKey] = useState("");
   const [isSaved, setIsSaved] = useState(false);
 
-  const [credStatus, setCredStatus] = useState<{ google: boolean; openai: boolean }>({
+  const [credStatus, setCredStatus] = useState<{ google: boolean; openai: boolean; hostManaged: boolean }>({
     google: false,
     openai: false,
+    hostManaged: false,
   });
   const [credMsg, setCredMsg] = useState<string | null>(null);
 
@@ -332,7 +349,11 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       if (!res.ok) throw new Error(data?.error || `${res.status} ${res.statusText}`);
 
       const s = data?.status || {};
-      setCredStatus({ google: !!s.google, openai: !!s.openai });
+      setCredStatus({
+        google: !!s.google,
+        openai: !!s.openai,
+        hostManaged: !!data?.hostManaged,
+      });
     } catch (e: any) {
       setCredMsg(`CREDENTIALS STATUS ERROR: ${String(e?.message || e)}`);
     }
@@ -555,8 +576,8 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-2xl flex justify-center p-4 lg:p-12 overflow-y-auto items-start py-12 lg:py-24">
-      <div className="w-full max-w-6xl bg-[#0a0a0c] border border-white/10 rounded-[2rem] shadow-2xl p-8 lg:p-12 relative overflow-visible">
+    <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-2xl flex justify-center p-4 lg:p-8 overflow-y-auto items-start py-6 lg:py-8">
+      <div className="w-full max-w-6xl bg-[#0a0a0c] border border-white/10 rounded-[2rem] shadow-2xl p-6 lg:p-8 relative overflow-visible">
         <div
           className="absolute inset-0 opacity-5 pointer-events-none rounded-[2rem]"
           style={{
@@ -564,7 +585,7 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             backgroundSize: "24px 24px",
           }}
         ></div>
-        <div className="relative z-10 flex justify-end">
+        <div className="relative z-10 flex justify-end mb-2">
           <button
             onClick={onClose}
             className="my-4 w-12 h-12 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-all sticky top-0"
@@ -573,148 +594,10 @@ export const ModelMap: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </button>
         </div>
 
-        {/* Secure Vault Section */}
-        <div id="vault">
-          <div className="p-8 bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <i className="fas fa-shield-halved text-6xl text-emerald-500"></i>
-            </div>
 
-            <div className="relative z-10">
-              <div className="mb-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-2">
-                  Secure Vault
-                </h3>
-                <p className="text-xl font-bold text-white uppercase tracking-tight">API Interface Credentials</p>
-                <p className="text-[10px] text-zinc-500 mt-1 uppercase font-medium">
-                  Paste your keys to use this deployment. Keys are encrypted and stored in the instance database. You can delete them any time.
-                </p>
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${
-                      credStatus.google ? "bg-emerald-600/30 text-emerald-300" : "bg-white/5 text-zinc-400"
-                    }`}
-                  >
-                    GOOGLE: {credStatus.google ? "SAVED" : "NOT SAVED"}
-                  </span>
-                  <span
-                    className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${
-                      credStatus.openai ? "bg-emerald-600/30 text-emerald-300" : "bg-white/5 text-zinc-400"
-                    }`}
-                  >
-                    OPENAI: {credStatus.openai ? "SAVED" : "NOT SAVED"}
-                  </span>
-                </div>
-
-                {credMsg ? (
-                  <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-amber-300">{credMsg}</p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Google */}
-                  <div className="flex-1">
-                    <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">Google (Gemini)</p>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={googleKey}
-                        onChange={(e) => setGoogleKey(e.target.value)}
-                        placeholder="Paste Google API key (raw key only)..."
-                        className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-emerald-400 focus:border-emerald-500/50 outline-none transition-all placeholder:text-zinc-700"
-                      />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
-                        <i className="fas fa-key text-[10px] text-emerald-500/30"></i>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* OpenAI */}
-                  <div className="flex-1">
-                    <p className="text-[9px] uppercase font-black text-zinc-600 mb-2">OpenAI</p>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={openaiKey}
-                        onChange={(e) => setOpenaiKey(e.target.value)}
-                        placeholder="Paste OpenAI API key (raw key only)..."
-                        className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-sm font-mono text-violet-300 focus:border-violet-500/50 outline-none transition-all placeholder:text-zinc-700"
-                      />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
-                        <i className="fas fa-key text-[10px] text-violet-500/30"></i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-                  <div className="flex gap-4">
-                    <a
-                      href="https://ai.google.dev/gemini-api/docs/billing"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 hover:text-white transition-colors underline decoration-zinc-800"
-                    >
-                      Setup Gemini Billing
-                    </a>
-                    <a
-                      href="https://platform.openai.com/api-keys"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[9px] font-bold uppercase tracking-widest text-zinc-600 hover:text-white transition-colors underline decoration-zinc-800"
-                    >
-                      Get OpenAI API Key
-                    </a>
-                  </div>
-
-                  <div className="flex flex-col items-stretch md:items-end gap-2">
-                    <button
-                      onClick={handleSaveKeys}
-                      className={`px-8 h-12 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-3 ${
-                        isSaved ? "bg-emerald-600 text-white" : "bg-white/5 hover:bg-white/10 text-white"
-                      }`}
-                    >
-                      <i className={`fas ${isSaved ? "fa-check" : "fa-sync"}`}></i>
-                      {isSaved ? "Keys Updated" : "Update Keys"}
-                    </button>
-
-                    <div className="flex flex-wrap gap-2 justify-end">
-                      {credStatus.google ? (
-                        <button
-                          type="button"
-                          onClick={deleteGoogleKey}
-                          className="px-4 h-10 rounded-2xl font-black uppercase tracking-widest text-[9px] bg-white/5 hover:bg-white/10 text-white transition-all"
-                        >
-                          Delete Google Key
-                        </button>
-                      ) : null}
-
-                      {credStatus.openai ? (
-                        <button
-                          type="button"
-                          onClick={deleteOpenAIKey}
-                          className="px-4 h-10 rounded-2xl font-black uppercase tracking-widest text-[9px] bg-white/5 hover:bg-white/10 text-white transition-all"
-                        >
-                          Delete OpenAI Key
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Paste keys only. No labels. No quotes.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* End Secure Vault */}
-
-        <br></br>
 
         <div className="relative z-10">
-          <div className="flex justify-between items-start mb-12 my-16">
+          <div className="flex justify-between items-start mb-8 mt-2">
             <div>
               <h2 className="text-[12px] font-black uppercase tracking-[0.5em] text-violet-500 mb-2">Model Blueprint</h2>
               <p className="text-3xl font-black uppercase tracking-tight text-white">Live Model Map</p>
